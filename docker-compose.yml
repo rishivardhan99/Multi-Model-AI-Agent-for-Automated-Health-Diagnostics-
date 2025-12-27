@@ -1,13 +1,49 @@
-version: "3.8"
 services:
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    image: md-bloodtests-ui:latest
+    command:
+      [
+        "streamlit",
+        "run",
+        "model3_ui/app.py",
+        "--server.port=8501",
+        "--server.address=0.0.0.0"
+      ]
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app:cached
+      - ./outputs:/app/outputs
+
+  model1:
+    build:
+      context: .
+      dockerfile: Dockerfile   # existing Model-1 Dockerfile (frozen)
+    image: md-bloodtests-model1:latest
+    volumes:
+      - .:/app:cached
+      - ./outputs:/app/outputs
+    # Worker image only – invoked via docker-compose run if needed
+
   model2:
     build:
       context: ./model2
       dockerfile: Dockerfile
-    container_name: md_model2
+    image: md-bloodtests-model2:latest
     volumes:
-      - ./data:/data:rw
-      - ./model2:/app:rw
-    environment:
-      - OLLAMA_URL=http://host.docker.internal:11434
-    tty: true
+      - .:/app:cached
+      - ./outputs:/app/outputs
+    # Runner: /app/model2/model2_runner.py
+
+  model3:
+    build:
+      context: ./model3
+      dockerfile: Dockerfile
+    image: md-bloodtests-model3:latest
+    volumes:
+      - .:/app:cached
+      - ./outputs:/app/outputs
+    # Runner: /app/model3/model3_runner.py

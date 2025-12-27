@@ -1,12 +1,7 @@
-# model2/pipeline/knowledge_graph.py
 """
 Lightweight knowledge graph implementation for deterministic reasoning.
-- Minimal dependency: uses Python dicts
-- Nodes are strings like "Platelets_LOW", "Anemia", "Iron_Deficiency"
-- Edges have relations (suggests, possible_cause, increases) and a weight (0-1)
-- This KG is intentionally small and explainable; extend it with more triples as needed.
+(unchanged core; small additional edges added)
 """
-
 from typing import Dict, List, Any
 
 class KnowledgeGraph:
@@ -39,7 +34,8 @@ class KnowledgeGraph:
             edges = self.query(obs, relation="possible_cause") + self.query(obs, relation="suggests")
             for e in edges:
                 tgt = e["target"]
-                scores[tgt] = max(scores.get(tgt, 0.0), e["weight"])  # take max weight evidence
+                # use max weight for simple evidence aggregation baseline
+                scores[tgt] = max(scores.get(tgt, 0.0), e["weight"])
         # normalize to 0-1 by dividing by max if >1
         mx = max(scores.values()) if scores else 0.0
         if mx > 1.0:
@@ -62,6 +58,7 @@ def build_medical_kg() -> KnowledgeGraph:
 
     # Inflammation / infection
     kg.add_edge("CRP_HIGH", "suggests", "Inflammation", 0.9, evidence="Raised CRP indicates acute inflammation")
+    kg.add_edge("CRP_HIGH", "possible_cause", "Bacterial_Infection", 0.6, evidence="Raised CRP can support bacterial infection")
     kg.add_edge("Neutrophils_HIGH", "possible_cause", "Bacterial_Infection", 0.8, evidence="Neutrophilia suggests bacterial infection")
     kg.add_edge("Lymphocytes_HIGH", "possible_cause", "Viral_Infection", 0.7, evidence="Lymphocytosis can suggest viral processes")
 

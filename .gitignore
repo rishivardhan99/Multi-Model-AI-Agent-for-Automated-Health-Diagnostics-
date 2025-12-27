@@ -25,6 +25,7 @@ Thumbs.db
 backups/
 bottemp/
 data/
+llm_model3_results/
 data;C/
 samples/
 temp/
@@ -32,3 +33,4 @@ bot.txt
 project_for_review.zip
 structured_batch.model1_final.csv
 
+.env

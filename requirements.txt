@@ -8,3 +8,5 @@ rapidfuzz==3.6.1
 streamlit==1.25.0
 pandas
 python-multipart
+numpy
+python-dotenv

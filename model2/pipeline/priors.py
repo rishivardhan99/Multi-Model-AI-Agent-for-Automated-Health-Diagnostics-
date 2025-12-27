@@ -1,16 +1,8 @@
-# model2/pipeline/priors.py
 """
 Reference ranges and priors.
-This module encodes:
-- Population-level reference ranges (examples). In real use, you should validate these vs lab standards.
-- Age/gender adjustments (simple).
-- Baseline prior probabilities for common probable causes (used to bias KG weights).
 """
-
 from typing import Dict, Tuple, Optional
 
-# Simplified reference ranges. NOTE: These are illustrative; adapt for your clinical standard.
-# Format: (low, high, units)
 REFERENCE_RANGES = {
     "Hemoglobin": {"male": (13.5, 17.5, "g/dL"), "female": (12.0, 15.5, "g/dL"), "default": (12.0, 17.5, "g/dL")},
     "Hematocrit": {"male": (41, 53, "%"), "female": (36, 46, "%"), "default": (36, 53, "%")},
@@ -36,10 +28,8 @@ REFERENCE_RANGES = {
     "Monocytes_PERCENT": {"default": (2, 8, "%")},
     "Eosinophils_PERCENT": {"default": (0, 6, "%")},
     "Basophils_PERCENT": {"default": (0, 2, "%")},
-
 }
 
-# Priors for probable causes (these are baseline weights; KG edges will combine with these)
 BASE_PRIORS = {
     "Iron_Deficiency": 0.05,
     "Vitamin_B12_Deficiency": 0.02,
@@ -50,13 +40,9 @@ BASE_PRIORS = {
     "Dyslipidemia": 0.04,
     "Kidney_Disease": 0.02,
     "Inflammation": 0.06,
-    
 }
 
 def get_reference_range(param: str, age: Optional[int]=None, gender: Optional[str]=None):
-    """
-    Return (low, high, units) for a parameter, using age/gender adjustments when available.
-    """
     info = REFERENCE_RANGES.get(param)
     if not info:
         return None
@@ -67,3 +53,7 @@ def get_reference_range(param: str, age: Optional[int]=None, gender: Optional[st
         if g.startswith("f") and "female" in info:
             return info["female"]
     return info.get("default") if isinstance(info, dict) else info
+
+def get_prior(cause: str) -> float:
+    """Return prior weight for a cause (0.0 if unknown)."""
+    return float(BASE_PRIORS.get(cause, 0.0))

@@ -1,63 +1,72 @@
-# model2/verifier.py
+"""
+Verifier for Model-2 output structure and simple guardrail checks.
+
+Provides verify_result(parsed) -> (ok: bool, message: str, sanitized_or_parsed)
+ - ok True means basic schema checks passed.
+ - If false and a sanitized variant is produced, sanitized is returned for inspection.
+
+This verifier is intentionally permissive about data types (Model-2 is mostly deterministic)
+but ensures the presence of key top-level keys so the UI / Model-3 can rely on them.
+"""
 from typing import Any, Tuple
 from jsonschema import validate, ValidationError
 
+# Minimal schema to validate that Model-2 output contains essential keys.
 SCHEMA = {
-  "type": "object",
-  "properties": {
-    "interpretation": {"type": "string"},
-    "numeric_fields": {
-      "type": "object",
-      "properties": {
-        "LDL": {"type": ["number","null"]},
-        "TG_HDL": {"type": ["number","null"]},
-        "cardio_risk_score": {"type": ["number","null"]}
-      },
-      "required": ["LDL","TG_HDL","cardio_risk_score"]
+    "type": "object",
+    "required": ["metadata", "parameters", "patterns", "probable_causes", "confidence"],
+    "properties": {
+        "metadata": {"type": "object"},
+        "parameters": {"type": "object"},
+        "status": {"type": "object"},
+        "notes": {"type": "object"},
+        "derived": {"type": "object"},
+        "patterns": {"type": "object"},
+        "probable_causes": {"type": "object"},
+        "cardio": {"type": "object"},
+        "severity": {"type": "object"},
+        "confidence": {"type": "object"},
     },
-    "severity": {
-      "type": "object",
-      "properties": {
-        "platelets": {"type":"object"},
-        "hemoglobin": {"type":"object"},
-        "ldl": {"type":"object"}
-      }
-    },
-    "red_flags": {"type": "array", "items": {"type": "string"}},
-    "recommendations": {"type": "array", "items": {"type": "string"}},
-    "explainability": {"type": "array", "items": {"type": "string"}},
-    "evidence_refs": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "claim": {"type":"string"},
-          "sources": {"type":"array", "items":{"type":"string"}}  # e.g. ["Platelets:109","LDL:84.6"]
-        },
-        "required":["claim","sources"]
-      }
-    }
-  },
-  "required": ["interpretation","numeric_fields","red_flags","recommendations","explainability"],
-  "additionalProperties": False
+    "additionalProperties": True
 }
 
-
-from model2.pipeline.guardrails import scan_for_dangerous_recommendations, redact_recommendations
+# guardrails functions (if defined) help detect dangerous content. Optional import to avoid hard dependency.
+try:
+    from model2.pipeline.guardrails import scan_for_dangerous_recommendations, redact_recommendations
+except Exception:
+    # define safe fallbacks if guardrails missing
+    def scan_for_dangerous_recommendations(x):
+        return False, []
+    def redact_recommendations(x):
+        return x
 
 def verify_result(parsed: Any) -> Tuple[bool, str, Any]:
+    """
+    Validate parsed Model-2 output. Returns (ok, message, parsed_or_sanitized)
+    """
     if parsed is None:
-        return False, "Could not parse JSON from LLM output", None
+        return False, "Parsed object is None", None
     if not isinstance(parsed, dict):
-        return False, "Parsed output not a JSON object", None
+        return False, "Parsed output is not a dict", None
     try:
         validate(instance=parsed, schema=SCHEMA)
     except ValidationError as e:
-        return False, f"Schema validation failed: {e.message}", None
-    recs = parsed.get("recommendations", [])
-    has_danger, offenders = scan_for_dangerous_recommendations(recs)
-    if has_danger:
-        sanitized = dict(parsed)
-        sanitized["recommendations"] = redact_recommendations(recs)
-        return False, f"Sanitized dangerous content (keywords: {', '.join(offenders)})", sanitized
+        return False, f"Schema validation failed: {e.message}", parsed
+
+    # If probable_causes contains string recommendations accidentally, scan
+    # (this is defensive; Model-2 normally has no 'recommendations' field)
+    # We scan any list under probable_causes.causes[*].support for suspicious tokens
+    try:
+        causes = parsed.get("probable_causes", {}).get("causes", [])
+        suspicious = []
+        for c in causes:
+            for s in c.get("support", []):
+                if isinstance(s, str) and any(k in s.lower() for k in ("prescribe", "dosage", "take", "surgery")):
+                    suspicious.append(s)
+        if suspicious:
+            return False, f"Detected suspicious content in probable_causes.support: {suspicious[:3]}", parsed
+    except Exception:
+        pass
+
+    # final: pass
     return True, "OK", parsed

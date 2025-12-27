@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "summary",
+    "possible_explanations",
+    "lifestyle_guidance",
+    "when_to_consult_doctor"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 20,
+      "description": "One concise paragraph summarizing the overall blood report"
+    },
+    "possible_explanations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 5
+      },
+      "minItems": 1,
+      "description": "Cautious, non-diagnostic explanations based strictly on Model-2 findings"
+    },
+    "lifestyle_guidance": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 5
+      },
+      "minItems": 1,
+      "description": "Non-prescriptive lifestyle suggestions"
+    },
+    "when_to_consult_doctor": {
+      "type": "string",
+      "minLength": 40,
+      "description": "Clear guidance on when to seek professional care. This MUST be specific, actionable, and mention at least one concrete trigger (symptoms, numeric threshold, or time-window)."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional clarification or uncertainty statement"
+    }
+  },
+  "additionalProperties": false
+}
