@@ -20,5 +20,3 @@ Model-2 consumes structured outputs from Model-1 (CSV) and performs:
 - JSON: `<base>.model2.json`
 - Text summary: `<base>.model2.txt`
 
-## Status
-**Frozen for Milestone-2**
