@@ -2,8 +2,13 @@
 import csv
 import json
 import re
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
+from pathlib import Path
 
+# local quality checks
+from .quality_checks import detect_low_data_quality
+
+# (only the ALIAS_MAP shown; replace this section in your loader)
 ALIAS_MAP = {
     "hdl_cholesterol": "HDL",
     "total_cholesterol": "Total_Cholesterol",
@@ -21,6 +26,7 @@ ALIAS_MAP = {
     "neutrophils": "Neutrophils",
     "lymphocytes": "Lymphocytes",
     "ldl": "LDL",
+    "ldl_cholesterol": "LDL",       # added mapping to canonical LDL
     "vldl": "VLDL",
     "urea_bun": "Urea_BUN",
     "urea": "Urea_BUN",
@@ -69,6 +75,34 @@ def _cast_number(s: Any):
         except Exception:
             return s
 
+def _load_param_map_expected(path_candidates: Optional[List[str]] = None) -> List[str]:
+    """
+    Try to locate param_map.json and return canonical expected param keys (param_id or canonical names).
+    Fallback: empty list.
+    """
+    if path_candidates is None:
+        path_candidates = [
+            Path(__file__).resolve().parents[2] / "extractor" / "param_map.json",
+            Path(__file__).resolve().parents[1] / "extractor" / "param_map.json",
+            Path(__file__).resolve().parents[3] / "param_map.json",
+        ]
+    for p in path_candidates:
+        try:
+            if p.exists():
+                j = json.loads(p.read_text(encoding="utf-8"))
+                # prefer param_id if present else key name
+                keys = []
+                for k, v in j.items():
+                    if isinstance(v, dict) and v.get("param_id"):
+                        keys.append(v.get("param_id"))
+                    else:
+                        # normalize key to canonical pattern used in loader
+                        keys.append(k.replace(" ", "_"))
+                return keys
+        except Exception:
+            continue
+    return []
+
 def load_input(path: str) -> Dict[str, Any]:
     """
     Load Model-1 output CSV (one-row) or JSON (testing).
@@ -78,7 +112,9 @@ def load_input(path: str) -> Dict[str, Any]:
         "gender": ...,
         "parameters": { <canonical param>: numeric_or_None, ... },
         "status": { <canonical param>: "LOW"/"HIGH"/"NORMAL", ... },
-        "notes": { <canonical param>: "..." }
+        "notes": { <canonical param>: "..." },
+        "missing_params": [...],
+        "quality": {...}   # new: quality flags from quality_checks.detect_low_data_quality
       }
     """
     result = {
@@ -86,6 +122,8 @@ def load_input(path: str) -> Dict[str, Any]:
         "status": {},
         "notes": {},
     }
+
+    expected_params = _load_param_map_expected()
 
     if path.lower().endswith(".json"):
         with open(path, "r", encoding="utf-8") as f:
@@ -107,6 +145,16 @@ def load_input(path: str) -> Dict[str, Any]:
                     result["status"][key] = up
                 else:
                     result["notes"][key] = str(v)
+        # quality checks
+        quality = detect_low_data_quality(result["parameters"], expected_params=expected_params)
+        result["quality"] = quality
+        # missing params relative to expected_params
+        missing = []
+        if expected_params:
+            for p in expected_params:
+                if p not in result["parameters"] or result["parameters"].get(p) is None:
+                    missing.append(p)
+        result["missing_params"] = missing
         return result
 
     # CSV case
@@ -115,6 +163,9 @@ def load_input(path: str) -> Dict[str, Any]:
         try:
             row = next(reader)
         except StopIteration:
+            # no row -> low quality
+            result["quality"] = {"low_data_quality": True, "reason": "empty_csv"}
+            result["missing_params"] = expected_params or []
             return result
 
     # process columns
@@ -153,5 +204,17 @@ def load_input(path: str) -> Dict[str, Any]:
         if isinstance(val, (int, float)) or val is None:
             result["parameters"][canonical] = val
         # everything else is ignored here (strings handled earlier as status/note)
+
+    # Now compute quality flags and missing params
+    quality = detect_low_data_quality(result["parameters"], expected_params=expected_params)
+    result["quality"] = quality
+
+    # missing params list
+    missing = []
+    if expected_params:
+        for p in expected_params:
+            if p not in result["parameters"] or result["parameters"].get(p) is None:
+                missing.append(p)
+    result["missing_params"] = missing
 
     return result

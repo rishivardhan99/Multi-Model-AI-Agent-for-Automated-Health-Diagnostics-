@@ -1,52 +1,31 @@
-streamlit
-pandas
-numpy
-pillow
-opencv-python-headless==4.9.0.80
-pytesseract
-pdf2image
-pdfplumber
-python-dotenv
-jsonschema
-
-# Core runtime
-
+# ---------------- Core runtime ----------------
 python-dotenv==1.0.1
 setuptools
 wheel
 
-
-# UI
-
+# ---------------- UI ----------------
 streamlit==1.36.0
 
-
-# Numeric & data stack (PINNED)
-
+# ---------------- Data stack ----------------
 numpy<2.0
 pandas==2.2.2
 
-
-# Images, OCR, computer vision
-
+# ---------------- Images / OCR ----------------
 pillow==10.4.0
 opencv-python-headless==4.9.0.80
 pytesseract==0.3.10
 
-
-# PDF handling
-
+# ---------------- PDF ----------------
 pdf2image==1.17.0
 pdfplumber==0.11.4
 
-# NLP / LLM / validation (Model-3)
-
-jsonschema==4.23.0
+# ---------------- NLP / LLM (NO SDKs) ----------------
 requests==2.32.3
+jsonschema==4.23.0
 
-# Utilities
-
+# ---------------- Utilities ----------------
 tqdm==4.66.5
 typing-extensions>=4.9.0
 rapidfuzz==3.6.1
 python-multipart==0.0.6
+pyyaml==6.0.2

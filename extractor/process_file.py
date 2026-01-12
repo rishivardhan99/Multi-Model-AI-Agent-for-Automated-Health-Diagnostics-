@@ -1,3 +1,4 @@
+# extractor/process_file.py
 #!/usr/bin/env python3
 """
 Lightweight single-file entry-point for your extractor.

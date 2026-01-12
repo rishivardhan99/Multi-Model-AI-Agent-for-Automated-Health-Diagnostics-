@@ -1,7 +1,10 @@
 """
-Reference ranges and priors.
+Reference ranges and conditional priors.
+
+Priors are small, conditional weights and include the 'requires' key to specify
+which themes or signals must be present for the prior to apply.
 """
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Any
 
 REFERENCE_RANGES = {
     "Hemoglobin": {"male": (13.5, 17.5, "g/dL"), "female": (12.0, 15.5, "g/dL"), "default": (12.0, 17.5, "g/dL")},
@@ -30,16 +33,17 @@ REFERENCE_RANGES = {
     "Basophils_PERCENT": {"default": (0, 2, "%")},
 }
 
+# Conditional priors: cause -> { base: float, requires: [themes/signals], description: str }
 BASE_PRIORS = {
-    "Iron_Deficiency": 0.05,
-    "Vitamin_B12_Deficiency": 0.02,
-    "ITP": 0.01,
-    "Viral_Infection": 0.02,
-    "Hypersplenism": 0.005,
-    "Metabolic_Syndrome": 0.03,
-    "Dyslipidemia": 0.04,
-    "Kidney_Disease": 0.02,
-    "Inflammation": 0.06,
+    "Iron_Deficiency": {"base": 0.05, "requires": ["erythrocyte_abnormality"], "description": "Iron deficiency prior applies when RBC/MCV pattern is present"},
+    "Vitamin_B12_Deficiency": {"base": 0.02, "requires": ["erythrocyte_abnormality"], "description": "Macrocytic signals increase this prior"},
+    "ITP": {"base": 0.01, "requires": ["platelet_suppression"], "description": "Isolated thrombocytopenia increases ITP prior"},
+    "Viral_Infection": {"base": 0.02, "requires": ["systemic_inflammation", "platelet_suppression"], "description": "Viral infections may cause thrombocytopenia/inflammation"},
+    "Hypersplenism": {"base": 0.005, "requires": ["platelet_suppression"], "description": "Splenic causes for low platelets"},
+    "Metabolic_Syndrome": {"base": 0.03, "requires": ["metabolic_sign", "lipid_dysregulation"], "description": "Metabolic prior requires metabolic/lipid signals"},
+    "Dyslipidemia": {"base": 0.04, "requires": ["lipid_dysregulation"], "description": "Lipid prior requires lipid dysregulation signal"},
+    "Kidney_Disease": {"base": 0.02, "requires": ["renal_stress"], "description": "Renal prior needs renal stress signal"},
+    "Inflammation": {"base": 0.06, "requires": ["systemic_inflammation"], "description": "Inflammation prior requires CRP/ESR elevation"},
 }
 
 def get_reference_range(param: str, age: Optional[int]=None, gender: Optional[str]=None):
@@ -54,6 +58,30 @@ def get_reference_range(param: str, age: Optional[int]=None, gender: Optional[st
             return info["female"]
     return info.get("default") if isinstance(info, dict) else info
 
-def get_prior(cause: str) -> float:
-    """Return prior weight for a cause (0.0 if unknown)."""
-    return float(BASE_PRIORS.get(cause, 0.0))
+def get_prior(cause: str, themes: Optional[list] = None) -> float:
+    """
+    Return prior weight for a cause (0.0 if unknown or preconditions not met).
+    `themes` is the list returned from themes.build_themes (list of dicts).
+    """
+    if cause not in BASE_PRIORS:
+        return 0.0
+    entry = BASE_PRIORS[cause]
+    base = float(entry.get("base", 0.0))
+    requires = entry.get("requires", []) or []
+    if not requires:
+        return base
+    if not themes:
+        return 0.0
+    # simple check: if any required theme in detected themes, allow prior
+    detected = {t.get("theme") for t in (themes or [])}
+    for r in requires:
+        # allow match if requirement is present among detected themes
+        if r in detected:
+            return base
+    # If no direct match but signal present (fallback), return reduced prior
+    # e.g., if theme detection missed but a signal stronger than 0.6 exists, allow small prior
+    theme_map = {t.get("theme"): t.get("strength", 0.0) for t in (themes or [])}
+    for r in requires:
+        if theme_map.get(r, 0.0) >= 0.6:
+            return base * 0.5
+    return 0.0

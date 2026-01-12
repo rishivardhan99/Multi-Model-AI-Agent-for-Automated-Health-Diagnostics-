@@ -1,14 +1,15 @@
 # Dockerfile.ui — single container for final Streamlit UI (app.py)
 FROM python:3.10-slim
 
-# Prevent Python from creating .pyc files and buffer stdout/stderr
+# -------------------- ENV --------------------
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+    LC_ALL=C.UTF-8 \
+    PYTHONPATH=/app
 
-# System packages needed for OCR and PDFs
+# -------------------- SYSTEM DEPS --------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     poppler-utils \
@@ -20,29 +21,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     fonts-dejavu-core \
     wget \
+    curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# -------------------- WORKDIR --------------------
 WORKDIR /app
 
-# Copy only requirements first for better caching
+# -------------------- PYTHON DEPS --------------------
 COPY requirements.ui.txt /app/requirements.ui.txt
-RUN pip install --upgrade pip setuptools wheel
-RUN pip install --no-cache-dir -r /app/requirements.ui.txt
 
-# Copy repo
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r /app/requirements.ui.txt
+
+# -------------------- COPY PROJECT --------------------
 COPY . /app
 
-# Expose Streamlit default port
+# -------------------- RUNTIME DIRS --------------------
+RUN mkdir -p \
+    /app/samples \
+    /app/outputs \
+    /app/outputs/structured_per_report \
+    /app/outputs/model1_per_report \
+    /app/outputs/model2_outputs \
+    /app/outputs/model3 \
+    /app/outputs/manifests \
+    /app/chatbot/vectorstore
+
+# -------------------- STREAMLIT --------------------
 EXPOSE 8501
 
-# Ensure outputs directories exist
-RUN mkdir -p /app/samples /app/outputs /app/outputs/model1_per_report /app/outputs/model2_outputs /app/outputs/model3
-
-# Healthcheck (optional)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD curl -sf http://localhost:8501/ || exit 1
 
-# Default command: run the final UI
-CMD ["streamlit", "run", "app.py", "--server.port", "8501", "--server.address", "0.0.0.0", "--logger.level", "info"]
+CMD ["streamlit", "run", "app.py", \
+     "--server.port=8501", \
+     "--server.address=0.0.0.0", \
+     "--logger.level=info"]

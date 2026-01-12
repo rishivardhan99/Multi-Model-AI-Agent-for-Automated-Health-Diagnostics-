@@ -1,3 +1,4 @@
+#extractor/step1_ingest.py
 import re
 from datetime import datetime
 from pathlib import Path
@@ -5,6 +6,7 @@ from step1_pdf_utils import pdf_to_images
 from step1_ocr_utils import ocr_image_to_text, ocr_image_to_data
 from param_extractor import extract_lab_parameters_from_ocr_data, extract_lab_parameters_from_text
 from json_utils import load_json_file
+
 
 def extract_patient_info_from_text(text):
     """
@@ -58,13 +60,45 @@ def process_image_file(filepath):
 
 def process_json_file(filepath):
     """
-    Process a JSON input: load it and assume it has the required fields.
+    Process a JSON input.
+    Supports:
+      1) Extractor-generated JSON with `extracted`
+      2) External blood-report JSON with `parameters`
     """
-    data = load_json_file(filepath)
-    patient_id = data.get('patient_id')
-    age = data.get('age')
-    gender = data.get('gender')
-    extracted = data.get('extracted', [])
+    from json_utils import load_json
+    from param_extractor import normalize_number, fuzzy_canonical
+
+    data = load_json(str(filepath))
+
+    patient_id = data.get("patient_id")
+    age = data.get("age")
+    gender = data.get("gender")
+
+    extracted = []
+
+    # Case 1: Already extractor-style
+    if isinstance(data.get("extracted"), list):
+        extracted = data["extracted"]
+
+    # Case 2: External blood report JSON
+    elif isinstance(data.get("parameters"), dict):
+        for raw_name, raw_value in data["parameters"].items():
+            value = normalize_number(raw_value)
+            canonical, score = fuzzy_canonical(raw_name)
+
+            extracted.append({
+                "raw_name": raw_name,
+                "raw_value": raw_value,
+                "value": value,
+                "unit": None,
+                "canonical": canonical,
+                "match_confidence": score,
+                "source": "json_parameters",
+                "raw_row_text": None,
+                "value_confidence": "high" if value is not None else "unknown",
+                "suspect_reason": None
+            })
+
     return patient_id, age, gender, extracted
 
 def ingest_file(input_path):

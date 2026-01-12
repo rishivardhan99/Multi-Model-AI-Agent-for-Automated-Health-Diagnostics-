@@ -3,10 +3,10 @@ Combine deterministic observations and KG inference to produce ranked probable c
 
 Improvements:
 - Penalize causes when key corroborating evidence is absent (negative evidence rules).
-- Boost causes when specific pattern_details exist (e.g., isolated thrombocytopenia -> ITP).
+- Boost causes when specific pattern_details indicate specific contexts (e.g., isolated thrombocytopenia -> ITP).
 - Return 'adjustments' explaining boosts/penalties (useful for UI & model3).
 """
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Optional
 from .knowledge_graph import KnowledgeGraph, build_medical_kg
 from .priors import BASE_PRIORS
 
@@ -18,11 +18,12 @@ CAUSE_SUPPORT_RULES = {
     # thrombocytopenia causes: none mandatory, but isolated thrombocytopenia boosts ITP
 }
 
-def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any], priors: Dict[str,float]=None) -> Dict[str,Any]:
+def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any], priors: Dict[str,float]=None, themes: Optional[List[Dict[str, Any]]]=None) -> Dict[str,Any]:
     """
     observations: list of observation node names e.g., ["Hemoglobin_LOW","MCV_LOW","Platelets_LOW"]
     pattern_details: patterns detected by pattern_engine (used for boosts/penalties)
     priors: base prior weights for causes (optional)
+    themes: optional list of theme dicts (from build_themes) to condition priors conservatively
     returns:
       {
         "causes": [
@@ -44,7 +45,6 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
         for e in edges:
             targ = e["target"]
             w = e["weight"]
-            # sum with damping to keep contributions meaningful but capped
             existing = combined.get(targ, 0.0)
             combined[targ] = min(1.0, existing + (w * 0.75))
             support.setdefault(targ, []).append(f"{obs}->{e['relation']}->{targ}")
@@ -58,18 +58,34 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
     # incorporate priors (multiplicative but gentle)
     if priors is None:
         priors = BASE_PRIORS
+
+    # theme-aware prior adjustment (conservative)
+    theme_boost: Dict[str, float] = {}
+    if themes:
+        top = themes[0] if len(themes) else None
+        if top:
+            tname = (top.get("theme") or "").lower()
+            if "lipid" in tname:
+                theme_boost["Dyslipidemia"] = 0.03
+                theme_boost["Metabolic_Syndrome"] = 0.02
+            if "renal" in tname or "renal_stress" in tname:
+                theme_boost["Kidney_Disease"] = 0.03
+            if "platelet" in tname:
+                theme_boost["ITP"] = 0.02
+
     for c in list(combined.keys()):
-        p = priors.get(c, 0.0)
+        prior_obj = priors.get(c, {})
+        p = float(prior_obj.get("base", 0.0))
+
+        p = p + float(theme_boost.get(c, 0.0))
         combined[c] = min(1.0, combined[c] * (1.0 + 0.5 * p))  # small prior influence
 
     # ADJUSTMENTS: apply domain-specific calibration rules (penalize/boost)
     adjustments: Dict[str, str] = {}
-    # quick helper to check presence of observation
     obs_set = set(observations)
 
     # 1) Penalize infection claims lacking inflammatory support
     for cause in list(combined.keys()):
-        # if cause requires supporting markers but none are present -> penalize
         reqs = CAUSE_SUPPORT_RULES.get(cause)
         if reqs:
             has_support = any(r in obs_set for r in reqs)
@@ -80,8 +96,8 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
                 adjustments[cause] = "reduced (key inflammatory markers missing; weak evidence)"
 
     # 2) Boost causes when pattern_details indicate specific contexts
-    # e.g., isolated thrombocytopenia -> boost ITP and Viral_Infection slightly
-    patt = pattern_details.get("patterns", {}) if isinstance(pattern_details, dict) else {}
+    patt = (pattern_details or {}).get("patterns", {})
+
     thromb = patt.get("thrombocytopenia", {}) if isinstance(patt.get("thrombocytopenia", {}), dict) else {}
     if thromb.get("present") and thromb.get("isolated"):
         for boost_c in ("ITP", "Viral_Infection"):
@@ -93,10 +109,16 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
     # 3) If a cause is suggested only by very weak KG evidence (low weight) and contradicting strong negative markers, mark weak
     for c in list(combined.keys()):
         if combined[c] < 0.15:
-            # record as weak_signal so downstream shows weaker language
             adjustments[c] = adjustments.get(c, "") + " weak_signal"
 
     # normalize relative to max so scores are comparable
+    RISK_CAUSES = {"Cardiovascular_Risk", "Metabolic_Risk"}
+
+    # Cap risk-type causes BEFORE normalization
+    for c in combined:
+        if c in RISK_CAUSES:
+            combined[c] = min(combined[c], 0.85)
+
     mx = max(combined.values()) if combined else 0.0
     if mx > 0:
         for k in combined:
@@ -106,12 +128,16 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
     sorted_causes = sorted(combined.items(), key=lambda kv: kv[1], reverse=True)
     causes_out: List[Dict[str,Any]] = []
     for cause, score in sorted_causes:
+        risk_type = "preventive" if cause in {"Cardiovascular_Risk", "Metabolic_Risk"} else "diagnostic"
+
         causes_out.append({
             "cause": cause,
             "score": score,
+            "risk_type": risk_type,
             "support": support.get(cause, [])[:6],
             "adjustment": adjustments.get(cause, ""),
             "source": "kg"
         })
+
 
     return {"causes": causes_out, "raw_scores": combined, "adjustments": adjustments}

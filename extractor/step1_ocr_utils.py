@@ -1,3 +1,4 @@
+# extractor/step1_ocr_utils.py
 import pytesseract
 from PIL import Image
 import cv2

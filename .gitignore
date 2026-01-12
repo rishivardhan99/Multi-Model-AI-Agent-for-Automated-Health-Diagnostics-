@@ -8,6 +8,7 @@ model2/outputs/
 model1/outputs/
 debug/
 
+inputs/
 # Docker
 *.log
 .env
@@ -33,4 +34,9 @@ bot.txt
 project_for_review.zip
 structured_batch.model1_final.csv
 
-.env
+model3/.env
+llmevals/.env
+chatbot/.env
+
+list_gemini_models.py 
+test_gemini_single.py

@@ -1,3 +1,4 @@
+# model2/verifier.py
 """
 Verifier for Model-2 output structure and simple guardrail checks.
 

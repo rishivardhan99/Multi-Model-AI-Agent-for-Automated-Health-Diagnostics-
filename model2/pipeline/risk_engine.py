@@ -1,5 +1,5 @@
-# model2/pipeline/risk_engine.py
 """
+model2/pipeline/risk_engine.py
 Derived metric calculations & heuristic cardiovascular risk estimate.
 
 - LDL (Friedewald): LDL = Total_Cholesterol - HDL - Triglycerides/5  (if triglycerides in mg/dL and < 400)
@@ -7,7 +7,7 @@ Derived metric calculations & heuristic cardiovascular risk estimate.
 - TG/HDL ratio
 - Total/HDL ratio
 
-Cardio risk estimate is a conservative, heuristic band (low/medium/high) based on age, LDL, HDL, TG, and smoking/diabetes flags if available.
+Cardio risk estimate is a conservative, heuristic band (low/medium/high).
 This is not a clinical score (do not present as Framingham / ASCVD). For research, plug in validated calculators later.
 """
 
@@ -18,7 +18,7 @@ def compute_derived(params: Dict[str, Any]) -> Dict[str, Any]:
     params: normalized parameter dict from loader
     returns dict of derived values and notes
     """
-    out = {}
+    out: Dict[str, Any] = {}
     tc = _num(params.get("Total_Cholesterol"))
     hdl = _num(params.get("HDL"))
     tg = _num(params.get("Triglycerides"))
@@ -26,29 +26,40 @@ def compute_derived(params: Dict[str, Any]) -> Dict[str, Any]:
 
     # compute LDL if missing and triglycerides present
     if ldl is None and tc is not None and hdl is not None and tg is not None:
-        if isinstance(tg, (int, float)) and tg < 400:
-            # Friedewald calculation
-            ldl_est = tc - hdl - (tg / 5.0)
-            out["LDL_estimated"] = round(ldl_est, 2)
-        else:
+        try:
+            if isinstance(tg, (int, float)) and tg < 400:
+                ldl_est = tc - hdl - (tg / 5.0)
+                out["LDL_estimated"] = round(ldl_est, 2)
+            else:
+                out["LDL_estimated"] = None
+        except Exception:
             out["LDL_estimated"] = None
     else:
         out["LDL_estimated"] = ldl
 
     # non-HDL
     if tc is not None and hdl is not None:
-        out["Non_HDL"] = round(tc - hdl, 2)
+        try:
+            out["Non_HDL"] = round(tc - hdl, 2)
+        except Exception:
+            out["Non_HDL"] = None
     else:
         out["Non_HDL"] = None
 
     # ratios
     if tg is not None and hdl is not None and hdl != 0:
-        out["TG_to_HDL_ratio"] = round(tg / hdl, 2)
+        try:
+            out["TG_to_HDL_ratio"] = round(tg / hdl, 2)
+        except Exception:
+            out["TG_to_HDL_ratio"] = None
     else:
         out["TG_to_HDL_ratio"] = None
 
     if tc is not None and hdl is not None and hdl != 0:
-        out["Total_to_HDL_ratio"] = round(tc / hdl, 2)
+        try:
+            out["Total_to_HDL_ratio"] = round(tc / hdl, 2)
+        except Exception:
+            out["Total_to_HDL_ratio"] = None
     else:
         out["Total_to_HDL_ratio"] = None
 
@@ -62,12 +73,32 @@ def _num(x: Optional[object]) -> Optional[float]:
     except Exception:
         return None
 
-def cardio_risk_band(params: Dict[str, Any], derived: Dict[str, Any]) -> Dict[str, Any]:
+def cardio_risk_band(params: Dict[str, Any], derived: Dict[str, Any], themes: Optional[list] = None) -> Dict[str, Any]:
     """
     Heuristic risk band (LOW, MODERATE, HIGH).
-    Uses age, LDL, HDL, TG_to_HDL, HbA1c or Glucose_Fasting as proxies.
-    This is intentionally conservative and explainable - do not present as a validated clinical risk score.
+    If themes do not indicate lipid/metabolic relevance, return {'applicable': False}.
     """
+    # determine if cardio is relevant via themes (if provided)
+    relevant_themes = {"lipid_dysregulation", "metabolic_sign", "glycemic_instability"}
+    # If themes are missing OR irrelevant → cardio not applicable
+    if not themes:
+        return {
+            "applicable": False,
+            "score": None,
+            "band": "NOT_APPLICABLE",
+            "notes": "Cardiovascular estimate not applicable (no dominant lipid or metabolic signal)."
+        }
+
+    top_themes = {t.get("theme") for t in themes if isinstance(t, dict)}
+    if not top_themes.intersection(relevant_themes):
+        return {
+            "applicable": False,
+            "score": None,
+            "band": "NOT_APPLICABLE",
+            "notes": "Cardiovascular estimate not applicable (no dominant lipid or metabolic signal)."
+        }
+
+    # existing computation follows (unchanged)
     score = 0.0
     age = params.get("age")
     try:
@@ -129,4 +160,4 @@ def cardio_risk_band(params: Dict[str, Any], derived: Dict[str, Any]) -> Dict[st
     else:
         band = "LOW"
 
-    return {"score": round(score, 2), "band": band, "notes": "Heuristic composite score; not a validated clinical risk tool."}
+    return {"applicable": True, "score": round(score, 2), "band": band, "notes": "Heuristic composite score; not a validated clinical risk tool."}

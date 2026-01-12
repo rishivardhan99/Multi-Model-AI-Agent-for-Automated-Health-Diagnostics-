@@ -53,6 +53,7 @@
     "aliases": ["mchc", "mean cell hemoglobin concentration", "mean corpuscular hemoglobin concentration"],
     "unit": "g/dL",
     "range": { "min": 31.0, "max": 36.0, "units": "g/dL" },
+    "hard_limits": { "min": 20.0, "max": 40.0 },
     "category": "hematology"
   },
   "MPV": {
@@ -269,6 +270,7 @@
     "aliases": ["free t4", "ft4"],
     "unit": "ng/dL",
     "range": { "min": 0.6, "max": 1.8, "units": "ng/dL" },
+    "hard_limits": { "min": 0.2, "max": 5.0 },
     "category": "endocrine"
   },
   "Free T3": {

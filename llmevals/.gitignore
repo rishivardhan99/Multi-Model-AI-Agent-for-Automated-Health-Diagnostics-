@@ -1,0 +1,4 @@
+outputs/
+inputs/
+.env
+test_grok.py

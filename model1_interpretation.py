@@ -1,4 +1,3 @@
-# model1_interpretation.py
 """
 Model-1 interpretation (updated)
 - Loads param_map.json ranges
@@ -15,6 +14,7 @@ import math
 from typing import Tuple, Dict, Any, Optional
 
 import pandas as pd
+from validation_and_standardization import _norm_key_simple
 
 ROOT = Path(__file__).resolve().parents[0]
 PARAM_MAP_PATH = ROOT / "extractor" / "param_map.json"
@@ -26,35 +26,55 @@ try:
 except Exception:
     PARAM_MAP = {}
 
+# Build normalized mapping for robust lookup (reuse same normalization rule)
+NORMALIZED_TO_CANON: dict = {}
+for canonical, info in PARAM_MAP.items():
+    NORMALIZED_TO_CANON[_norm_key_simple(canonical)] = canonical
+    aliases = info.get("aliases", []) if isinstance(info, dict) else []
+    for a in aliases:
+        NORMALIZED_TO_CANON[_norm_key_simple(a)] = canonical
+    param_id = info.get("param_id") if isinstance(info, dict) else None
+    if param_id:
+        NORMALIZED_TO_CANON[_norm_key_simple(str(param_id))] = canonical
+
+
 def _canonical_lookup(key: Optional[str]) -> Optional[str]:
     if key is None:
         return None
-    s = str(key).strip().lower()
+    s = str(key).strip()
     if not s:
         return None
-    # prefer exact-case from PARAM_MAP keys
+    norm = _norm_key_simple(s)
+    # prefer normalized mapping
+    if norm in NORMALIZED_TO_CANON:
+        return NORMALIZED_TO_CANON[norm]
+    # fallback: exact-case match in PARAM_MAP
     for k in PARAM_MAP.keys():
-        if k.lower() == s:
+        if k.lower() == s.lower():
             return k
-    # fallback: try alias matching inside PARAM_MAP entries
+    # fallback: try aliases
     for k, info in PARAM_MAP.items():
         aliases = info.get("aliases", []) if isinstance(info, dict) else []
         for a in aliases:
-            if str(a).strip().lower() == s:
+            if str(a).strip().lower() == s.lower():
                 return k
     # last fallback: return original string (preserve)
     return key
 
+
 def _get_range_and_unit_from_map(canonical: Optional[str]) -> Tuple[Optional[float], Optional[float], Optional[str]]:
     if canonical is None:
         return None, None, None
-    # canonical may be provided lowercase or canonical key
-    # find matching param_map entry case-insensitively
+    # prefer normalized lookup
+    norm = _norm_key_simple(canonical)
     entry = None
-    for k, v in PARAM_MAP.items():
-        if k.lower() == str(canonical).strip().lower():
-            entry = v
-            break
+    if norm in NORMALIZED_TO_CANON:
+        entry = PARAM_MAP.get(NORMALIZED_TO_CANON[norm])
+    else:
+        for k, v in PARAM_MAP.items():
+            if k.lower() == str(canonical).strip().lower():
+                entry = v
+                break
     if entry is None:
         return None, None, None
     rng = entry.get("range", {}) if isinstance(entry, dict) else {}
@@ -68,11 +88,13 @@ def _get_range_and_unit_from_map(canonical: Optional[str]) -> Tuple[Optional[flo
         lo = hi = None
     return lo, hi, units
 
+
 def _safe_isnan(x):
     try:
         return isinstance(x, float) and math.isnan(x)
     except Exception:
         return False
+
 
 def classify_value_and_reason(v: Optional[float], lo: Optional[float], hi: Optional[float], border_frac: float = 0.10) -> Tuple[str, str]:
     """
@@ -115,6 +137,7 @@ def classify_value_and_reason(v: Optional[float], lo: Optional[float], hi: Optio
         return "HIGH", f"{v_f} > {hi_f}"
     return "UNKNOWN", "unhandled_case"
 
+
 def interpret_dataframe(df_std: pd.DataFrame,
                         save_outputs: bool = True,
                         out_dir: Optional[Path] = None,
@@ -145,7 +168,7 @@ def interpret_dataframe(df_std: pd.DataFrame,
         # canonical normalization: prefer actual param_map canonical name if possible
         canon_raw = r.get("canonical")
         canon = _canonical_lookup(canon_raw)
-        # ensure we preserve canonical column in output exactly as used in your pipeline (lower/upper)
+        # ensure we preserve canonical column in output exactly as used in your pipeline
         if canon is None and isinstance(canon_raw, str):
             canon = canon_raw
 

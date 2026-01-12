@@ -1,11 +1,9 @@
+#!/usr/bin/env python3
 """
+extractor/run_model1_on_csv.py
 Run Model-1 on per-report structured CSVs and produce per-report final CSVs
 matching Streamlit UI final CSV shape.
-
-Input: outputs/structured_per_report/<stem>.structured.csv
-Output: outputs/model1_per_report/<stem>.model1_final.csv
 """
-
 import sys
 from pathlib import Path
 import pandas as pd
@@ -14,13 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from validation_and_standardization import read_structured_csv, standardize_dataframe
+from validation_and_standardization import read_structured_csv, standardize_dataframe, _norm_key_simple
 from model1_interpretation import interpret_dataframe
 
 STRUCTURED_DIR = ROOT / "outputs" / "structured_per_report"
 FINAL_DIR = ROOT / "outputs" / "model1_per_report"
 FINAL_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR = ROOT / "outputs"   # used by interpret_dataframe save
+
 
 def _infer_param_column(df):
     candidates = ['canonical', 'canonical_name', 'parameter', 'param', 'test_name', 'test', 'name']
@@ -36,6 +35,7 @@ def _infer_param_column(df):
                 return c
     return None
 
+
 def _infer_status_column(df):
     candidates = ['status', 'interpret', 'flag', 'classification']
     for kw in candidates:
@@ -43,6 +43,7 @@ def _infer_status_column(df):
             if kw in c.lower():
                 return c
     return None
+
 
 def _infer_note_column(df):
     candidates = ['note', 'explain', 'comment', 'interpretation', 'message']
@@ -52,11 +53,41 @@ def _infer_note_column(df):
                 return c
     return None
 
+
 def process_one(struct_path: Path):
     stem = struct_path.stem.replace(".structured", "") if struct_path.stem.endswith(".structured") else struct_path.stem
     # 1) read long form and standardize
     df_long = read_structured_csv(struct_path)
     df_std = standardize_dataframe(df_long)
+
+    # --------------------------------------------------------------
+    # DETECT implausible parameters (collect canonical names) BEFORE dropping rows
+    # --------------------------------------------------------------
+    invalid_params = set()
+    if "valid" in df_std.columns and "invalid_reason" in df_std.columns:
+        bad_rows = df_std[
+            (df_std["valid"] == False) &
+            (df_std["invalid_reason"] == "implausible_value")
+        ]
+        # collect canonical keys (normalized) for later blanking of wide CSV columns
+        for p in bad_rows["canonical"].dropna().unique():
+            invalid_params.add(_norm_key_simple(str(p)))
+
+    # --------------------------------------------------------------
+    # HARD DROP: remove implausible rows BEFORE interpretation
+    # --------------------------------------------------------------
+    if "valid" in df_std.columns and "invalid_reason" in df_std.columns:
+        before = len(df_std)
+        df_std = df_std[
+            ~(
+                (df_std["valid"] == False) &
+                (df_std["invalid_reason"] == "implausible_value")
+            )
+        ].copy()
+        after = len(df_std)
+        print(f"[Model-1] HARD DROP removed {before - after} implausible rows")
+        # Debug artifact (one-time): shows what's left after enforcement
+        df_std.to_csv(ROOT / "outputs" / f"{stem}.debug_after_hard_drop.csv", index=False)
 
     # 2) interpret using model1 (same as Streamlit)
     try:
@@ -75,7 +106,28 @@ def process_one(struct_path: Path):
         units_used = {}
 
     # 3) start from base (wide numeric) — keep patient metadata
-    base = pd.read_csv(struct_path)
+    base = pd.read_csv(struct_path, dtype=str).fillna("")
+    # --------------------------------------------------------------
+    # Remove implausible params in the wide CSV (value + status + note)
+    # This blanks the original numeric cells so final CSV no longer contains
+    # implausible numeric values that were dropped earlier.
+    # --------------------------------------------------------------
+    def _norm(s):
+        return "".join(ch for ch in str(s).lower() if ch.isalnum())
+
+    if invalid_params:
+        for col in list(base.columns):
+            if col in ("filename", "patient_id", "age", "gender"):
+                continue
+
+            root = col
+            if root.endswith("_status"):
+                root = root[:-7]
+            elif root.endswith("_note"):
+                root = root[:-5]
+
+            if _norm(root) in invalid_params:
+                base[col] = ""
 
     # compute which numeric parameters are actually present in this structured CSV
     keep_core = {'filename', 'patient_id', 'age', 'gender'}
@@ -102,7 +154,15 @@ def process_one(struct_path: Path):
             if param_col not in df_interp.columns:
                 print(f"Warning: expected parameter column '{param_col}' not found in interpretation output; skipping status/note pivot for {struct_path.name}")
             else:
-                df_interp_filtered = df_interp[df_interp[param_col].isin(numeric_cols)].copy()
+                def _canon(s):
+                    return str(s).lower().replace(" ", "").replace("_", "").replace(".", "")
+
+                canon_numeric = {_canon(c) for c in numeric_cols}
+
+                df_interp_filtered = df_interp[
+                    df_interp[param_col].map(_canon).isin(canon_numeric)
+                ].copy()
+
                 if df_interp_filtered.empty:
                     # nothing to merge for this file
                     pass
@@ -155,6 +215,7 @@ def process_one(struct_path: Path):
     base.to_csv(out_path, index=False)
     print("Final →", out_path.name)
 
+
 def main():
     files = sorted(STRUCTURED_DIR.glob("*.structured.csv"))
     if not files:
@@ -162,7 +223,6 @@ def main():
         return
     for f in files:
         process_one(f)
-
 
 
 if __name__ == "__main__":

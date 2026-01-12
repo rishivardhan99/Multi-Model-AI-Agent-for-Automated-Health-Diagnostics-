@@ -1,12 +1,3 @@
-# validation_and_standardization.py
-"""
-Read structured CSV (wide) -> convert to long, standardize and validate.
-Exports:
- - read_structured_csv(structured_path: Path) -> pd.DataFrame (long)
- - standardize_dataframe(df_long: pd.DataFrame) -> pd.DataFrame (standardized)
-Preserves backwards compatibility: adds columns but keeps original ones.
-"""
-
 from pathlib import Path
 import re
 import json
@@ -17,6 +8,93 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[0]
 PARAM_MAP_PATH = ROOT / "extractor" / "param_map.json"
+
+
+def _norm_key_simple(s: str) -> str:
+    if s is None:
+        return ""
+    return "".join(ch for ch in str(s).lower() if ch.isalnum())
+
+
+def is_implausible(canon: str, value: float) -> bool:
+    """
+    Conservative physiological sanity check.
+    Drops OCR-scale errors (e.g. Free T4 = 14 instead of 1.4).
+    Uses normalized canonical lookup to find ranges in PARAM_MAP.
+
+    NEW: Also checks 'hard_limits' in PARAM_MAP entries (if present).
+    If value lies strictly outside hard_limits -> mark implausible.
+    """
+    try:
+        if value is None:
+            return False
+        # Normalize incoming canon key
+        norm = _norm_key_simple(canon)
+
+        # lookup canonical resolved key from NORMALIZED_TO_CANON (built below)
+        canon_key = NORMALIZED_TO_CANON.get(norm)
+        if canon_key is None:
+            # no entry found -> cannot mark as implausible based on map
+            return False
+
+        info = PARAM_MAP.get(canon_key)
+        if not isinstance(info, dict):
+            return False
+
+        # ----- NEW: check explicit hard_limits first -----
+        hard = info.get("hard_limits") if isinstance(info, dict) else None
+        if isinstance(hard, dict):
+            hlo = hard.get("min")
+            hhi = hard.get("max")
+            try:
+                if hlo is not None:
+                    hlo = float(hlo)
+                if hhi is not None:
+                    hhi = float(hhi)
+                # If hard limit exists and value outside -> implausible
+                if hlo is not None and value < hlo:
+                    return True
+                if hhi is not None and value > hhi:
+                    return True
+            except Exception:
+                # if casting fails, continue to the fallback checks below
+                pass
+        # -------------------------------------------------
+
+        rng = info.get("range", {}) or {}
+        lo = rng.get("min")
+        hi = rng.get("max")
+        if lo is None and hi is None:
+            return False
+        # cast
+        try:
+            if lo is not None:
+                lo = float(lo)
+        except Exception:
+            lo = None
+        try:
+            if hi is not None:
+                hi = float(hi)
+        except Exception:
+            hi = None
+
+        # conservative 5x/10x checks similar to previous logic but robust
+        if lo is not None and hi is not None:
+            if value > hi * 5:
+                return True
+            if value < lo / 10:
+                return True
+        elif hi is not None:
+            if value > hi * 5:
+                return True
+        elif lo is not None:
+            if value < lo / 5:
+                return True
+    except Exception:
+        return False
+
+    return False
+
 
 # Load param_map.json (used for canonical keys, preferred unit, ranges, aliases)
 try:
@@ -37,9 +115,24 @@ for canonical, info in PARAM_MAP.items():
     # also map the canonical string itself lower->canonical
     ALIAS_TO_CANON[str(canonical).strip().lower()] = canonical
 
+# Build a normalized -> canonical mapping for robust lookup
+NORMALIZED_TO_CANON: dict = {}
+for canonical, info in PARAM_MAP.items():
+    k_norm = _norm_key_simple(canonical)
+    NORMALIZED_TO_CANON[k_norm] = canonical
+    # also map aliases normalized -> canonical
+    aliases = info.get("aliases", []) if isinstance(info, dict) else []
+    for a in aliases:
+        NORMALIZED_TO_CANON[_norm_key_simple(a)] = canonical
+    # also map param_id if present
+    param_id = info.get("param_id") if isinstance(info, dict) else None
+    if param_id:
+        NORMALIZED_TO_CANON[_norm_key_simple(str(param_id))] = canonical
+
 
 # ---------- helper: numeric parsing ----------
 NUM_RE = re.compile(r'([<>]?\s*-?\d+(?:[.,]\d+)?)')
+
 
 def parse_number(s: Optional[str]) -> Optional[float]:
     """Extract a numeric value from a string. Returns float or None."""
@@ -77,33 +170,27 @@ def parse_number(s: Optional[str]) -> Optional[float]:
 
 
 # ---------- unit conversion helpers ----------
-# A small conversion table (observed_unit -> standard_unit) -> multiplier applied to observed to become standard
-# e.g., observed "g/L" -> standard "g/dL" factor 0.1 (g/L * 0.1 = g/dL)
 CONVERSION_FACTORS = {
-    # hemoglobin g/L -> g/dL
     ("g/l", "g/dl"): 0.1,
     ("g/dl", "g/l"): 10.0,
-    # hematocrit L/L -> % (if standard is percent)
     ("l/l", "%"): 100.0,
     ("%","l/l"): 0.01,
-    # RBC 10^6/uL and 10^12/L often compatible (1 10^6/uL = 10^12/L)
     ("10^6/ul", "10^12/l"): 1000.0,
     ("10^12/l", "10^6/ul"): 0.001,
-    # WBC 10^3/uL <-> 10^9/L (1 10^3/uL = 10^9/L)
     ("10^3/ul", "10^9/l"): 1.0,
     ("10^9/l", "10^3/ul"): 1.0,
-    # creatinine mg/dL <-> µmol/L (common factor ~88.4); user should expand mapping as needed
     ("mg/dl", "umol/l"): 88.4,
     ("umol/l", "mg/dl"): 1.0/88.4,
-    # triglycerides mg/dL <-> mmol/L (factor 0.01129)
     ("mg/dl", "mmol/l"): 0.01129,
     ("mmol/l", "mg/dl"): 1/0.01129,
 }
+
 
 def _norm_unit(u: Optional[str]) -> str:
     if u is None:
         return ""
     return str(u).strip().lower()
+
 
 def convert_value(value: Optional[float], obs_unit: str, std_unit: str) -> Optional[float]:
     """Convert observed numeric value to standard unit if conversion factor exists."""
@@ -113,18 +200,14 @@ def convert_value(value: Optional[float], obs_unit: str, std_unit: str) -> Optio
     std = _norm_unit(std_unit)
     if obs == "" or std == "" or obs == std:
         return value
-    # Try exact match in table
     f = CONVERSION_FACTORS.get((obs, std))
     if f is not None:
         try:
             return float(value) * float(f)
         except Exception:
             return value
-    # Try fallback: if obs contains std as substring or vice versa, skip
     if std in obs or obs in std:
-        # no conversion known -> return value (assume compatible)
         return value
-    # No known conversion -> return original (caller can flag unit mismatch)
     return value
 
 
@@ -132,12 +215,6 @@ def convert_value(value: Optional[float], obs_unit: str, std_unit: str) -> Optio
 def read_structured_csv(structured_path: Path) -> pd.DataFrame:
     """
     Read a wide structured CSV (the one created from extraction) and convert to long format.
-
-    Expected wide CSV columns:
-      filename, patient_id, age, gender, <param1>, <param2>, ...
-    This function melts parameter columns and returns long DataFrame with columns:
-      filename, patient_id, age, gender, parameter, canonical, raw_value
-    where `canonical` is the canonical name taken from PARAM_MAP keys when we can match, else parameter text.
     """
     p = Path(structured_path)
     if not p.exists():
@@ -159,22 +236,20 @@ def read_structured_csv(structured_path: Path) -> pd.DataFrame:
         meta = {c: row.get(c, "") for c in meta_cols}
         for param in param_cols:
             raw_val = row.get(param, "")
-            if raw_val == "":
-                # still include empty rows (so we preserve parameter list) — but we may drop later
-                pass
-            # map param -> canonical if alias exists
-            pkey = str(param).strip().lower()
+            # map param -> canonical if alias exists (use normalized map)
+            pkey = str(param).strip()
             canonical = None
-            if pkey in ALIAS_TO_CANON:
-                canonical = ALIAS_TO_CANON[pkey]
+            norm = _norm_key_simple(pkey)
+            if norm in NORMALIZED_TO_CANON:
+                canonical = NORMALIZED_TO_CANON[norm]
             else:
-                # try exact match against canonical keys
-                if pkey in CANONICAL_KEYS:
-                    canonical = CANONICAL_KEYS[pkey]
+                # fallback: try direct case-insensitive match
+                if pkey.lower() in CANONICAL_KEYS:
+                    canonical = CANONICAL_KEYS[pkey.lower()]
                 else:
-                    # try fuzzy/simple substring: check if any canonical contains param token
+                    # try substring heuristic
                     for kk in CANONICAL_KEYS:
-                        if kk in pkey and len(kk) >= 3:
+                        if kk in pkey.lower() and len(kk) >= 3:
                             canonical = CANONICAL_KEYS[kk]
                             break
             rows.append({
@@ -188,8 +263,6 @@ def read_structured_csv(structured_path: Path) -> pd.DataFrame:
             })
 
     df_long = pd.DataFrame(rows)
-    # normalize columns
-    # keep ordering stable
     cols = ["patient_id", "filename", "age", "gender", "parameter", "canonical", "raw_value"]
     df_long = df_long[cols]
     return df_long
@@ -198,12 +271,12 @@ def read_structured_csv(structured_path: Path) -> pd.DataFrame:
 # ---------- standardize_dataframe ----------
 def standardize_dataframe(df_long: pd.DataFrame) -> pd.DataFrame:
     """
-    Given the long-form dataframe, extract numeric values, normalize units & produce:
-      - value_std (original extracted numeric string optionally normalized)
+    Extract numeric values, normalize units & produce:
+      - value_std (string)
       - value_num (float)
-      - unit_std (string: preferred unit from param_map.json or observed)
-      - valid (bool), invalid_reason (str or empty)
-    Returns a new DataFrame (copy) with added columns.
+      - unit_std (string)
+      - valid (bool), invalid_reason (str)
+    If a value is implausible per param_map -> mark invalid and clear raw_value to act like missing.
     """
     df = df_long.copy()
 
@@ -217,51 +290,47 @@ def standardize_dataframe(df_long: pd.DataFrame) -> pd.DataFrame:
     unit_std = []
     valid_flags = []
     invalid_reasons = []
+    scale_corrections = []  # 'div10','mul10' or ''
+    raw_value_out = []
 
+    # iterate rows and build outputs (exactly one append per input row)
     for idx, r in df.iterrows():
         raw = r.get("raw_value", "")
-        # sometimes param_map includes a unit field per canonical
-        canon = r.get("canonical") or ""
-        canon_key = str(canon).strip()
+        canon_raw = r.get("canonical") or ""
+        canon_key = _norm_key_simple(canon_raw)
+
         pm_entry = None
-        if canon_key:
-            # find param map entry case-insensitively
-            for k, v in PARAM_MAP.items():
-                if k.lower() == str(canon_key).strip().lower() or (isinstance(v, dict) and v.get("param_id") and str(v.get("param_id")).lower() == str(canon_key).lower()):
-                    pm_entry = v
-                    break
+        # resolve canonical map entry if available
+        mapped_canonical = NORMALIZED_TO_CANON.get(canon_key)
+        if mapped_canonical:
+            pm_entry = PARAM_MAP.get(mapped_canonical)
 
         # preferred unit from param map
         preferred_unit = ""
         if isinstance(pm_entry, dict):
             preferred_unit = pm_entry.get("unit") or pm_entry.get("range", {}).get("units") or ""
 
-        # Attempt to parse number
+        # parse numeric
         num = parse_number(raw)
 
-        # try detect unit suffix in raw (e.g., "13 g/dL", "13mg/dL", "13 %")
+        # detect unit suffix
         detected_unit = ""
         if isinstance(raw, str) and raw.strip():
-            # capture trailing non-numeric tokens
             m = re.search(r'[A-Za-z%µμμμ^0-9/\. ]+$', raw.strip())
             if m:
                 candidate = m.group(0).strip()
-                # clean candidate
-                candidate = candidate.replace("µ", "u").replace("μ","u")
-                # pick only token that contains letters or % or slash
+                candidate = candidate.replace("µ", "u").replace("μ", "u")
                 if any(ch.isalpha() or ch in "%/" for ch in candidate):
                     detected_unit = candidate
 
-        # normalize detected unit
         detected_unit_norm = _norm_unit(detected_unit)
         preferred_unit_norm = _norm_unit(preferred_unit)
 
-        # If numeric exists and preferred unit different, attempt conversion if factor found
         converted_num = num
         unit_to_report = detected_unit_norm or preferred_unit_norm or ""
 
+        # convert units if mapping exists
         if num is not None and preferred_unit_norm and detected_unit_norm and detected_unit_norm != preferred_unit_norm:
-            # convert numeric if mapping exists
             conv = CONVERSION_FACTORS.get((detected_unit_norm, preferred_unit_norm))
             if conv is not None:
                 try:
@@ -270,17 +339,16 @@ def standardize_dataframe(df_long: pd.DataFrame) -> pd.DataFrame:
                 except Exception:
                     converted_num = num
             else:
-                # try other heuristics: e.g., percent vs ratio L/L
                 if detected_unit_norm == "l/l" and preferred_unit_norm == "%":
-                    converted_num = float(num) * 100.0
-                    unit_to_report = preferred_unit_norm
-                # else leave as is and report both in units_used later
+                    try:
+                        converted_num = float(num) * 100.0
+                        unit_to_report = preferred_unit_norm
+                    except Exception:
+                        pass
 
-        # If numeric is None, but raw contains only decimals with % etc, attempt to strip and parse
+        # fallback parse if num None
         if num is None and isinstance(raw, str) and raw.strip():
-            # sometimes value is like "<0.5" etc - parse_number covers it but just in case
             try:
-                # fallback: get all digits and decimal, e.g. "ND" or "—" will remain None
                 token = re.search(r'-?\d+(?:[.,]\d+)?', raw)
                 if token:
                     num = float(token.group(0).replace(",", "."))
@@ -288,30 +356,118 @@ def standardize_dataframe(df_long: pd.DataFrame) -> pd.DataFrame:
             except Exception:
                 pass
 
-        # determine validity
+        # OCR DECIMAL SCALE CORRECTION (conservative)
+        scale_note = ""
+        try:
+            if converted_num is not None and isinstance(pm_entry, dict):
+                rng = pm_entry.get("range") or {}
+                lo = rng.get("min")
+                hi = rng.get("max")
+                lof = None
+                hif = None
+                try:
+                    if lo is not None:
+                        lof = float(lo)
+                except Exception:
+                    lof = None
+                try:
+                    if hi is not None:
+                        hif = float(hi)
+                except Exception:
+                    hif = None
+
+                if lof is not None or hif is not None:
+                    v = float(converted_num)
+                    if lof is not None and hif is not None:
+                        span = max(hif - lof, 1.0)
+                    else:
+                        if lof is not None:
+                            span = max(abs(lof) * 0.2, 1.0)
+                        elif hif is not None:
+                            span = max(abs(hif) * 0.2, 1.0)
+                        else:
+                            span = 1.0
+                    margin = 0.10 * span
+
+                    applied = False
+                    if hif is not None:
+                        try:
+                            if v > hif * 2:
+                                v_div = v / 10.0
+                                if (lof is None or (lof - margin) <= v_div) and (hif is None or v_div <= (hif + margin)):
+                                    converted_num = v_div
+                                    scale_note = "div10"
+                                    applied = True
+                        except Exception:
+                            pass
+
+                    if (not applied) and lof is not None:
+                        try:
+                            if v < lof / 2:
+                                v_mul = v * 10.0
+                                if (lof is None or (lof - margin) <= v_mul) and (hif is None or v_mul <= (hif + margin)):
+                                    converted_num = v_mul
+                                    scale_note = "mul10"
+                                    applied = True
+                        except Exception:
+                            pass
+        except Exception:
+            scale_note = ""
+
+        # determine validity & implausible-drop
         if num is None:
             valid = False
             reason = "no_numeric"
+            converted_num = None
         else:
-            valid = True
-            reason = ""
+            try:
+                if converted_num is None:
+                    valid = False
+                    reason = "no_numeric_after_processing"
+                else:
+                    # If implausible per param_map (10x/5x rule OR hard_limits) -> treat as missing (drop)
+                    if is_implausible(canon_raw, float(converted_num)):
+                        valid = False
+                        reason = "implausible_value"
+                        # key action: remove the raw_value so downstream behaves like missing
+                        converted_num = None
+                        raw = ""
+                    else:
+                        valid = True
+                        reason = ""
+            except Exception:
+                valid = True
+                reason = ""
 
-        # final values appended
-        value_nums.append(None if converted_num is None else float(converted_num))
-        # keep a string version for display (prefer the numeric cleaned)
-        value_std.append("" if converted_num is None else str(converted_num))
-        unit_std.append(unit_to_report)
-        valid_flags.append(valid)
-        invalid_reasons.append(reason)
+        # append outputs (exactly one per row)
+        if converted_num is None:
+            value_nums.append(None)
+            value_std.append("")
+        else:
+            try:
+                value_nums.append(float(converted_num))
+                value_std.append(str(converted_num))
+            except Exception:
+                value_nums.append(None)
+                value_std.append("")
 
+        unit_std.append(unit_to_report if unit_to_report else "")
+        valid_flags.append(bool(valid))
+        invalid_reasons.append(reason if reason else "")
+        scale_corrections.append(scale_note)
+        raw_value_out.append(raw if raw is not None else "")
+
+    # assign columns
     df["value_std"] = value_std
     df["value_num"] = value_nums
     df["unit_std"] = unit_std
     df["valid"] = valid_flags
     df["invalid_reason"] = invalid_reasons
+    df["scale_correction"] = scale_corrections
+    # Overwrite raw_value with processed raw_value - this is important so downstream treats implausible as missing
+    df["raw_value"] = raw_value_out
 
     # preserve other columns; ensure types
-    # cast age to numeric if possible
     if "age" in df.columns:
         df["age"] = pd.to_numeric(df["age"], errors="coerce")
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+extractor/run_batch_model1.py
 Batch runner that produces per-report final CSVs identical in shape to Streamlit UI:
  - outputs/structured_per_report/<stem>.structured.csv  (wide numeric + metadata)
  - outputs/model1_per_report/<stem>.model1_final.csv    (numeric + <param>_status + <param>_note)
@@ -165,6 +166,7 @@ def _get_param_range(canon: str):
 def _select_best_candidate(canon: str, cands: list):
     if not cands:
         return None, None, None
+
     lo, hi = _get_param_range(canon)
 
     def in_range(v):
@@ -179,7 +181,30 @@ def _select_best_candidate(canon: str, cands: list):
     def score(c):
         return float(c.get("match_confidence") or 0.0)
 
-    in_rng = [c for c in cands if in_range(c.get("value"))]
+    # ---------- NEW: de-prioritize range-boundary artifacts ----------
+    def is_range_bound(c):
+        v = c.get("value")
+        if v is None:
+            return False
+        # exact boundary match
+        if lo is not None and abs(v - lo) < 1e-9:
+            return True
+        if hi is not None and abs(v - hi) < 1e-9:
+            return True
+        # extractor already flags these
+        if c.get("suspect_reason") in (
+            "value_equals_range_bound",
+            "value_may_be_range_bound_or_fallback",
+        ):
+            return True
+        return False
+
+    clean = [c for c in cands if not is_range_bound(c)]
+    pool = clean if clean else cands
+    # ---------------------------------------------------------------
+
+    # ORIGINAL LOGIC (unchanged, but applied to pool)
+    in_rng = [c for c in pool if in_range(c.get("value"))]
     if in_rng:
         best = max(in_rng, key=score)
         return best["value"], score(best), best.get("raw_name")
@@ -189,7 +214,7 @@ def _select_best_candidate(canon: str, cands: list):
         span = hi - lo
         lo2 = lo - 0.3 * span
         hi2 = hi + 0.3 * span
-        for c in cands:
+        for c in pool:
             v = c.get("value")
             if v is None:
                 continue
@@ -199,39 +224,80 @@ def _select_best_candidate(canon: str, cands: list):
         best = max(relaxed, key=score)
         return best["value"], score(best), best.get("raw_name")
 
-    plausible = [c for c in cands if isinstance(c.get("value"), (int, float)) and abs(c["value"]) < 1000]
-    pool = plausible or cands
-    best = max(pool, key=score)
+    plausible = [c for c in pool if isinstance(c.get("value"), (int, float)) and abs(c["value"]) < 1000]
+    best = max(plausible or pool, key=score)
     return best["value"], score(best), best.get("raw_name")
+
+def hard_drop_implausible(df):
+    """
+    Remove rows flagged as implausible by validation layer.
+    This is the single enforcement gate for Model-1 sanitation.
+    Returns a copy with implausible rows removed.
+    """
+    try:
+        if "valid" not in df.columns or "invalid_reason" not in df.columns:
+            return df
+        before = len(df)
+        df = df[
+            ~(
+                (df["valid"] == False) &
+                (df["invalid_reason"] == "implausible_value")
+            )
+        ].copy()
+        after = len(df)
+        print(f"[Model-1] HARD DROP removed {before - after} implausible rows")
+        return df
+    except Exception as e:
+        # defensive: do not crash pipeline
+        print(f"[Model-1] hard_drop_implausible error: {e}")
+        return df
 
 # Sanity-check helper: uses PARAM_MAP if available, else global rules
 def is_plausible_value(param, v):
+    """
+    Decide whether a numeric value is biologically plausible.
+
+    This function MUST NOT reject valid abnormal values.
+    It should only reject values that are physically / biologically impossible
+    or clear OCR garbage.
+    """
     try:
         fv = float(v)
     except Exception:
         return False
-    # global quick filters
-    if fv <= 0:
-        # we consider zero/negative invalid for many labs; Streamlit had logic to remove placeholder zeros
+
+    # reject NaN / inf
+    if not np.isfinite(fv):
         return False
+
+    # reject zeros / negatives for labs that cannot be zero or negative
+    # (keep conservative — do NOT use reference ranges)
+    if fv <= 0:
+        return False
+
+    # absolute hard ceiling: OCR garbage protection
+    # (covers cases like 99999, 1234567, etc.)
     if abs(fv) > 1e5:
         return False
+
+    # OPTIONAL: very loose sanity bounds for known parameters (SAFE)
     info = PARAM_MAP.get(param) or PARAM_MAP_JSON.get(param)
     if isinstance(info, dict):
-        rng = info.get("range")
-        if isinstance(rng, dict):
-            lo = rng.get("min")
-            hi = rng.get("max")
+        hard = info.get("hard_limits")
+        if isinstance(hard, dict):
+            lo = hard.get("min")
+            hi = hard.get("max")
             try:
-                if lo is not None and hi is not None:
-                    lo = float(lo); hi = float(hi)
-                    span = max(hi - lo, 1e-6)
-                    lo_rel = lo - 0.3*span
-                    hi_rel = hi + 0.3*span
-                    return lo_rel <= fv <= hi_rel
+                if lo is not None and fv < float(lo):
+                    return False
+                if hi is not None and fv > float(hi):
+                    return False
             except Exception:
                 pass
-    # default accept if global checks passed
+
+    # IMPORTANT:
+    # DO NOT reject based on reference ranges
+    # Abnormal values MUST survive
     return True
 
 # Final CSV shaping helpers copied / adapted from Streamlit (note generation)
@@ -336,22 +402,22 @@ def process_file(path: Path):
         row[canon] = val if val is not None else ""
 
     # SANITY CHECK: clear implausible values (and keep an audit note)
-    row_notes = {}
-    for k in list(row.keys()):
-        if k in ("filename", "patient_id", "age", "gender"):
-            continue
-        v = row.get(k)
-        if v in ("", None):
-            continue
-        try:
-            if not is_plausible_value(k, v):
-                row_notes[k] = f"Cleared by sanity-check (value: {v})"
-                row[k] = ""
-        except Exception:
-            pass
-    if row_notes:
-        # put into _notes key so postprocess can see if desired
-        row["_notes"] = row_notes
+    # row_notes = {}
+    # for k in list(row.keys()):
+    #     if k in ("filename", "patient_id", "age", "gender"):
+    #         continue
+    #     v = row.get(k)
+    #     if v in ("", None):
+    #         continue
+    #     try:
+    #         if not is_plausible_value(k, v):
+    #             row_notes[k] = f"Cleared by sanity-check (value: {v})"
+    #             row[k] = ""
+    #     except Exception:
+    #         pass
+    # if row_notes:
+    #     # put into _notes key so postprocess can see if desired
+    #     row["_notes"] = row_notes
 
     # postprocess salvage rules (uses your postprocess.postprocess_row)
     try:
@@ -377,11 +443,14 @@ def process_file(path: Path):
         writer.writeheader()
         writer.writerow({k: row.get(k, "") for k in fieldnames})
     print("Wrote structured:", out_struct.name)
+    
 
     # Now produce final Model-1 CSV (Streamlit-identical shaping)
     try:
         df_long = read_structured_csv(out_struct)
         df_std = standardize_dataframe(df_long)
+        df_std = hard_drop_implausible(df_std)
+
     except Exception as e:
         print("Standardization error:", e)
         df_long = pd.DataFrame()

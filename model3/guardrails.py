@@ -6,7 +6,6 @@ Functions:
 - redact_recommendations(list_of_strings) -> sanitized_list
 - scan_parsed_object_for_danger(parsed) -> (bool, offenders, sanitized)
 """
-
 from typing import List, Tuple, Any, Dict
 
 DANGEROUS_KEYWORDS = [
@@ -17,12 +16,14 @@ DANGEROUS_KEYWORDS = [
 
 SAFE_REDACT_PLACEHOLDER = "Recommendation removed for safety; consult a clinician."
 
+
 def _find_offenders(text: str) -> List[str]:
     if not isinstance(text, str):
         return []
     low = text.lower()
     offenders = [k for k in DANGEROUS_KEYWORDS if k in low]
     return offenders
+
 
 def scan_for_dangerous_recommendations(items: List[str]) -> Tuple[bool, List[str]]:
     """
@@ -39,6 +40,7 @@ def scan_for_dangerous_recommendations(items: List[str]) -> Tuple[bool, List[str
                 offenders.append(o)
     return (len(offenders) > 0, offenders)
 
+
 def redact_recommendations(items: List[str]) -> List[str]:
     """
     Replace any item containing dangerous keywords with a safe placeholder.
@@ -53,6 +55,7 @@ def redact_recommendations(items: List[str]) -> List[str]:
         else:
             out.append(it)
     return out
+
 
 def scan_parsed_object_for_danger(parsed: Dict[str, Any]) -> Tuple[bool, List[str], Dict[str, Any]]:
     """
@@ -87,7 +90,6 @@ def scan_parsed_object_for_danger(parsed: Dict[str, Any]) -> Tuple[bool, List[st
                 for o in offs:
                     if o not in offenders:
                         offenders.append(o)
-                # replace offending phrase region with placeholder (conservative)
                 san[key] = SAFE_REDACT_PLACEHOLDER
 
     return had, offenders, san

@@ -1,5 +1,5 @@
+# table_utils.py
 """
-table_utils.py
 Creates pivot views and summary tables for interpreted parameter rows.
 """
 
@@ -8,14 +8,13 @@ import pandas as pd
 
 def pivot_params_to_wide(df):
     df = df.copy()
-    df["param_col"] = df.apply(
-        lambda r: f"{r['canonical']} ({r['unit_std']})" if r["unit_std"] else r["canonical"],
-        axis=1
-    )
+
+    df["param_col"] = df["canonical"]
+
     return df.pivot_table(
         index=["patient_id", "filename", "age", "gender"],
         columns="param_col",
-        values="value_std",
+        values="value_num",   # use numeric values for downstream processing
         aggfunc="first"
     ).reset_index()
 
@@ -33,20 +32,3 @@ def patient_level_flag(df):
     )
     out["any_abnormal"] = out["n_abnormal"] > 0
     return out.reset_index()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,4 +1,5 @@
 """
+streamlit_app.py just for model1
 FULL PIPELINE APP (OPTION 1) - UPDATED
 -----------------------------------------
 PDF / Image / JSON  → OCR / Extraction → structured.csv →
@@ -239,6 +240,7 @@ def _get_param_range(canon: str):
 def _select_best_candidate(canon: str, cands: list):
     if not cands:
         return None, None, None
+
     lo, hi = _get_param_range(canon)
 
     def in_range(v):
@@ -253,8 +255,30 @@ def _select_best_candidate(canon: str, cands: list):
     def score(c):
         return float(c.get("match_confidence") or 0.0)
 
-    in_rng = [c for c in cands if in_range(c.get("value"))]
+    # ---------- NEW: de-prioritize range-boundary artifacts ----------
+    def is_range_bound(c):
+        v = c.get("value")
+        if v is None:
+            return False
+        # exact boundary match
+        if lo is not None and abs(v - lo) < 1e-9:
+            return True
+        if hi is not None and abs(v - hi) < 1e-9:
+            return True
+        # extractor already flags these
+        if c.get("suspect_reason") in (
+            "value_equals_range_bound",
+            "value_may_be_range_bound_or_fallback",
+        ):
+            return True
+        return False
 
+    clean = [c for c in cands if not is_range_bound(c)]
+    pool = clean if clean else cands
+    # ---------------------------------------------------------------
+
+    # ORIGINAL LOGIC (unchanged, but applied to pool)
+    in_rng = [c for c in pool if in_range(c.get("value"))]
     if in_rng:
         best = max(in_rng, key=score)
         return best["value"], score(best), best.get("raw_name")
@@ -264,22 +288,19 @@ def _select_best_candidate(canon: str, cands: list):
         span = hi - lo
         lo2 = lo - 0.3 * span
         hi2 = hi + 0.3 * span
-        for c in cands:
+        for c in pool:
             v = c.get("value")
             if v is None:
                 continue
             if lo2 <= v <= hi2:
                 relaxed.append(c)
-
     if relaxed:
         best = max(relaxed, key=score)
         return best["value"], score(best), best.get("raw_name")
 
-    plausible = [c for c in cands if isinstance(c.get("value"), (int, float)) and abs(c["value"]) < 1000]
-    pool = plausible or cands
-    best = max(pool, key=score)
+    plausible = [c for c in pool if isinstance(c.get("value"), (int, float)) and abs(c["value"]) < 1000]
+    best = max(plausible or pool, key=score)
     return best["value"], score(best), best.get("raw_name")
-
 
 # ------------------------------------------------------------
 # Extract parameters from text blob

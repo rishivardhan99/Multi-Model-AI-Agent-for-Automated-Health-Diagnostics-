@@ -1,0 +1,8 @@
+# chatbot/config/chatbot_config.yaml
+retrieval_enabled: false
+chunk_max_chars: 2000
+embedding_model: all-MiniLM-L6-v2
+index_dir: ./vectorstore
+max_retrieved_chunks: 6
+max_context_tokens: 2000
+chat_history_turns: 3

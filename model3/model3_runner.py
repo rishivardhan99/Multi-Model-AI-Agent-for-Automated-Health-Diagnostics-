@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# model3/model3_runner.py
 """
 Model-3 runner that:
  - Uses LLMs (primary + fallback_models) to produce a guarded JSON narrative.
  - Validates schema (schema_model3.json).
  - Applies guardrails (detect & redact dangerous recommendations).
- - Enforces deterministic 'when_to_consult_doctor' priority (replaces LLM if too weak).
+ - DOES NOT overwrite LLM 'when_to_consult_doctor' (deterministic advice recorded in meta).
  - Writes exactly 3 files for audit: json, txt, prompt.
 """
 
@@ -190,20 +189,24 @@ def compact_merged_context(rows):
 
 def enforce_consult_priority(parsed_obj, compact_context, user_context):
     """
-    Ensure 'when_to_consult_doctor' is detailed and actionable. If LLM field is short/generic,
-    replace with deterministic_consult_advice() and record deterministic advice in meta.
-    Returns (patched_obj, meta_patch)
+    Compute deterministic consult advice and return meta_patch WITHOUT modifying parsed_obj.
+    Do NOT replace or overwrite LLM-generated 'when_to_consult_doctor'.
+    Returns (parsed_obj_unmodified, meta_patch)
     """
     meta_patch = {}
-    interpreted = interpret_context(user_context or {})
+    try:
+        interpreted = interpret_context(user_context or {})
+    except Exception:
+        interpreted = {}
     deterministic = deterministic_consult_advice(compact_context, user_context or {}, interpreted)
     meta_patch["when_to_consult_deterministic"] = deterministic
 
+    # Also compute an 'accept' flag for whether the parsed_obj has a sufficiently specific when_to_consult
+    accept = False
     when_field = None
     if isinstance(parsed_obj, dict):
         when_field = parsed_obj.get("when_to_consult_doctor") or parsed_obj.get("when_to_consult")
 
-    accept = False
     if isinstance(when_field, str):
         wf = when_field.strip()
         lower = wf.lower()
@@ -212,14 +215,7 @@ def enforce_consult_priority(parsed_obj, compact_context, user_context):
         if len(wf) >= 60 and has_trigger:
             accept = True
 
-    if not accept:
-        if isinstance(parsed_obj, dict):
-            parsed_obj["when_to_consult_doctor"] = deterministic
-            parsed_obj.setdefault("notes", "")
-            if "replacement_of_when_to_consult" not in parsed_obj["notes"]:
-                parsed_obj["notes"] = (parsed_obj["notes"] + " ").strip() + "replacement_of_when_to_consult: deterministic advice applied."
-        else:
-            parsed_obj = {"when_to_consult_doctor": deterministic}
+    meta_patch["when_to_consult_accepted_by_llm"] = accept
     return parsed_obj, meta_patch
 
 def main():
@@ -254,8 +250,6 @@ def main():
         try:
             user_context_sanitized = load_user_context(args.user_context)
             user_context_interpreted = interpret_context(user_context_sanitized)
-            # append interpretive summary to sanitized for prompts
-            user_context_sanitized.update(user_context_interpreted)
         except Exception as e:
             print(f"[WARN] Could not load/interpret user_context {args.user_context}: {e}", file=sys.stderr)
             user_context_sanitized = {}
@@ -278,7 +272,15 @@ def main():
                             merged_context_raw[f"{k}_extra"] = v
 
     compact_context = compact_merged_context(merged_context_raw)
-    prompt = build_prompt_from_row(compact_context, user_context=user_context_sanitized)
+
+    # Build prompt_user_context carefully: preserve original fields and only inject context_summary (if present)
+    prompt_user_context = dict(user_context_sanitized)  # shallow copy; do NOT mutate user_context_sanitized elsewhere
+    cs = user_context_interpreted.get("context_summary")
+    if cs and not prompt_user_context.get("context_summary"):
+        # set context_summary if not present in sanitized data, without overwriting other fields like gender
+        prompt_user_context["context_summary"] = cs
+
+    prompt = build_prompt_from_row(compact_context, user_context=prompt_user_context)
 
     # build models list
     models_to_try = []
@@ -340,7 +342,6 @@ def main():
                 attempt["parsed"] = sanitized
                 attempt["danger_offenders"] = offenders
                 model_attempts.append(attempt)
-                # still attempt schema validation with sanitized output
                 parsed = sanitized
                 print(f"[WARN] Dangerous content detected and redacted ({offenders}). Proceeding with sanitized output.")
 
@@ -350,10 +351,10 @@ def main():
                 attempt["parsed"] = parsed
                 model_attempts.append(attempt)
 
-                # enforce deterministic consult priority
-                patched_parsed, meta_patch = enforce_consult_priority(parsed, compact_context, user_context_sanitized)
+                # compute deterministic consult advice but DO NOT overwrite LLM field
+                _, meta_patch = enforce_consult_priority(parsed, compact_context, user_context_sanitized)
 
-                final_result = patched_parsed
+                final_result = parsed
                 final_model_used = model_name
 
                 result_record = {
@@ -367,7 +368,7 @@ def main():
                         "user_context_interpreted": user_context_interpreted
                     }
                 }
-                print(f"[INFO] Model {model_name} produced a schema-valid output (after guardrails & consult enforcement).")
+                print(f"[INFO] Model {model_name} produced a schema-valid output (after guardrails).")
                 break
 
             except ValidationError as e:
