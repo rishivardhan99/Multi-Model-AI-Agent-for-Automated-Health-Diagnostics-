@@ -8,7 +8,7 @@ The system integrates **OCR, deterministic clinical reasoning, knowledge-graph�
 
 > ⚠️ **Medical Disclaimer**  
 > This platform is strictly an **assistive decision-support system** intended for educational and research use.  
-> It does **not** provide diagnoses, prescriptions, or treatment recommendations. All outputs must be reviewed by a qualified medical professional.
+> It does **not** provide  prescriptions, or treatment recommendations. All outputs must be reviewed by a qualified medical professional.
 
 ---
 
@@ -139,11 +139,7 @@ model3/
 └── gemini_client.py
 ```
 
-**Important prompt rules added (Model-3):**
-- Rule 11: *Do NOT interpret numeric values as abnormal unless Model-2 flags a pattern.*
-- Rule 13 (new): *If a complete group of related measurements is provided (e.g., lipid profile, CBC) and no Model-2 abnormal pattern is flagged, explicitly state that no significant abnormal pattern is identified for that group.*  
-  — prevents omission ambiguity.
-- Rule 14 (new): *If Model-2 relies on a single signal, Model-3 may note limited evidence using cautious language (e.g., "may benefit from clinical correlation") but must NOT negate or reclassify Model-2.*
+
 
 **Outputs**
 ```
