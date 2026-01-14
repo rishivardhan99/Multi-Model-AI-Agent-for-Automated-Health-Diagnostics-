@@ -1,0 +1,46 @@
+{
+  "filename": "clean_00003_1768312272436.model1_final",
+  "model2_path": "/app/inputs/model2/clean_00003_1768312272436.model1_final.model2.json",
+  "model3_path": "/app/inputs/model3/clean_00003_1768312272436.model1_final.model2.json",
+  "eval": {
+    "filename": "clean_00003_1768312272436.model1_final.csv",
+    "overall_score": 80,
+    "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces some minor discrepancies.",
+    "issues": [
+      {
+        "type": "missing",
+        "severity": "low",
+        "message": "Model3 omits the 'inflammation' signal present in Model2."
+      },
+      {
+        "type": "hallucination",
+        "severity": "low",
+        "message": "Model3 introduces a 'glycemic_instability' signal not supported by Model2."
+      }
+    ],
+    "strengths": [
+      "Consistent interpretation of anemia and lipid dysregulation signals",
+      "Accurate identification of microcytic anemia"
+    ],
+    "suggested_fix": [
+      "Re-evaluate the 'inflammation' signal to ensure consistency with Model2",
+      "Remove the 'glycemic_instability' signal as it is not supported by Model2"
+    ],
+    "metrics": {
+      "precision_like": 0.9,
+      "recall_like": 0.8
+    },
+    "raw_eval": "Model3's overall performance is good, but requires minor adjustments to ensure consistency with Model2."
+  },
+  "validation": {
+    "raw_score": 80.0,
+    "penalty": 7.0,
+    "validated_score": 73.0,
+    "is_abstain": false,
+    "abstention_type": null,
+    "system_pass": true,
+    "reasons": [
+      "validated_score_meets_soft_threshold"
+    ]
+  }
+}

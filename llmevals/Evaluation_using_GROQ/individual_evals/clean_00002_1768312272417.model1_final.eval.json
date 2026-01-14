@@ -1,0 +1,46 @@
+{
+  "filename": "clean_00002_1768312272417.model1_final",
+  "model2_path": "/app/inputs/model2/clean_00002_1768312272417.model1_final.model2.json",
+  "model3_path": "/app/inputs/model3/clean_00002_1768312272417.model1_final.model2.json",
+  "eval": {
+    "filename": "clean_00002_1768312272417.model1_final.csv",
+    "overall_score": 80,
+    "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces a new claim of Cardiovascular Risk.",
+    "issues": [
+      {
+        "type": "missing",
+        "severity": "low",
+        "message": "Model3 omits the 'inflammation' signal present in Model2."
+      },
+      {
+        "type": "hallucination",
+        "severity": "high",
+        "message": "Model3 introduces a new claim of Cardiovascular Risk not supported by Model2."
+      }
+    ],
+    "strengths": [
+      "renal_stress",
+      "lipid_dysregulation"
+    ],
+    "suggested_fix": [
+      "Re-evaluate the 'inflammation' signal",
+      "Provide evidence for Cardiovascular Risk claim"
+    ],
+    "metrics": {
+      "precision_like": 0.8,
+      "recall_like": 0.7
+    },
+    "raw_eval": "Model3's overall score is 80 due to the introduction of a new claim and omission of the 'inflammation' signal."
+  },
+  "validation": {
+    "raw_score": 80.0,
+    "penalty": 22.0,
+    "validated_score": 58.0,
+    "is_abstain": true,
+    "abstention_type": "clinical",
+    "system_pass": true,
+    "reasons": [
+      "clinical_abstention_due_to_high_risk_output"
+    ]
+  }
+}

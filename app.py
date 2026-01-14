@@ -915,7 +915,8 @@ try:
                     raise RuntimeError("Model-3 failed: " + m3msg)
                 render_progress_card("Step 4 — Model-3 (narrative)", "success", "Narrative generated")
 
-                canonical_base = model1_path.stem
+                canonical_base = Path(m2json).stem
+
                 md_content = make_markdown_report(canonical_base, model1_path, m2obj, m3obj, preserve_ctx if preserve_ctx else None, include_details=include_details)
 
                 if batch_mode:

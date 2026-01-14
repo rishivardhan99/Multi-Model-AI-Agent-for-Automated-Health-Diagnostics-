@@ -4,6 +4,47 @@ docker build -t medicube-ui -f Dockerfile.ui .
 
 docker run --rm -p 8501:8501 medicube-ui     
 
+EXTRACTOR/MODEL1 
+    in root 
+    docker build -t md-bloodtests:model1-frozen .
+    docker run -d -p 8501:8501 --name md-bloodtests-model1 md-bloodtests:model1-frozen
+    docker stop md-bloodtests-model1
+    docker rm md-bloodtests-model1
+
+
+
+MODEL2
+
+    cd model2 
+    docker build -t model2 .
+    docker run --rm `       
+    -v "${PWD}\..\inputs:/app/input" `       
+    -v "${PWD}\..\outputs:/app/outputs" `
+    model2 `
+    --input /app/input/clean_00021.model1_final.csv `     
+    --output_dir /app/outputs
+
+
+
+
+MODEl3
+
+    docker build -t model3 .
+    docker run --rm `
+    --env-file .env `
+    -v "${PWD}\..\outputs:/app/outputs" `
+    model3 `
+    --input /app/outputs/model2_outputs/clean_00021.model1_final.model2.json `
+    --out_dir /app/outputs
+
+
+CHATBOT 
+    in root 
+    docker build -f chatbot/Dockerfile -t medicube-chatbot chatbot
+    docker run --rm -p 8501:8501 `
+    -v "${PWD}\chatbot:/app/chatbot" `
+    medicube-chatbot
+
 
 
 

@@ -1,0 +1,45 @@
+{
+  "filename": "clean_00001_1768312272406.model1_final",
+  "model2_path": "/app/inputs/model2/clean_00001_1768312272406.model1_final.model2.json",
+  "model3_path": "/app/inputs/model3/clean_00001_1768312272406.model1_final.model2.json",
+  "eval": {
+    "filename": "clean_00001_1768312272406.model3_final.csv",
+    "overall_score": 80,
+    "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces some minor discrepancies.",
+    "issues": [
+      {
+        "type": "missing",
+        "severity": "low",
+        "message": "Model3 omits the 'inflammation' signal present in Model2."
+      },
+      {
+        "type": "hallucination",
+        "severity": "low",
+        "message": "Model3 introduces a 'glycemic_instability' signal not supported by Model2."
+      }
+    ],
+    "strengths": [
+      "Platelet suppression is a strong theme in both models.",
+      "Thrombocytopenia is identified as a probable cause in both models."
+    ],
+    "suggested_fix": [
+      "Review Model3's interpretation of the 'inflammation' signal to ensure consistency with Model2."
+    ],
+    "metrics": {
+      "precision_like": 0.8,
+      "recall_like": 0.9
+    },
+    "raw_eval": "Model3's overall performance is good, but requires careful review of minor discrepancies with Model2."
+  },
+  "validation": {
+    "raw_score": 80.0,
+    "penalty": 7.0,
+    "validated_score": 73.0,
+    "is_abstain": false,
+    "abstention_type": null,
+    "system_pass": true,
+    "reasons": [
+      "validated_score_meets_soft_threshold"
+    ]
+  }
+}

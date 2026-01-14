@@ -97,6 +97,18 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
 
     # 2) Boost causes when pattern_details indicate specific contexts
     patt = (pattern_details or {}).get("patterns", {})
+    # ------------------------------------------------------------------
+    # HARD GATE: Do NOT assert etiologies if parent pattern is absent
+    # ------------------------------------------------------------------
+    anemia_patt = patt.get("anemia", {}) if isinstance(patt.get("anemia", {}), dict) else {}
+
+    if not anemia_patt.get("present", False):
+        # CBC shows no anemia → block iron deficiency / B12 deficiency
+        for c in ("Iron_Deficiency", "Vitamin_B12_Deficiency"):
+            if c in combined:
+                combined[c] = round(combined[c] * 0.05, 3)
+                adjustments[c] = "suppressed (no anemia pattern present; etiology cannot be inferred)"
+
 
     thromb = patt.get("thrombocytopenia", {}) if isinstance(patt.get("thrombocytopenia", {}), dict) else {}
     if thromb.get("present") and thromb.get("isolated"):
@@ -119,7 +131,12 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
         if c in RISK_CAUSES:
             combined[c] = min(combined[c], 0.85)
 
+    
     mx = max(combined.values()) if combined else 0.0
+    # prevent single weak causes from normalizing to 1.0
+    if mx < 0.4:
+        mx = 1.0
+
     if mx > 0:
         for k in combined:
             combined[k] = round(combined[k] / mx, 3)
@@ -129,6 +146,12 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
     causes_out: List[Dict[str,Any]] = []
     for cause, score in sorted_causes:
         risk_type = "preventive" if cause in {"Cardiovascular_Risk", "Metabolic_Risk"} else "diagnostic"
+
+        # downgrade diagnostic claims when evidence is weak
+        if adjustments.get(cause, "").startswith("suppressed") or score < 0.25:
+            risk_type = "suggestive"
+
+
 
         causes_out.append({
             "cause": cause,

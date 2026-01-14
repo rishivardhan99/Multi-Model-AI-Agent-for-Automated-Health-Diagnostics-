@@ -47,7 +47,7 @@ def build_medical_kg() -> KnowledgeGraph:
     kg = KnowledgeGraph()
     # Hematology
     kg.add_edge("Hemoglobin_LOW", "suggests", "Anemia", 0.9, evidence="Low haemoglobin suggests anemia")
-    kg.add_edge("MCV_LOW", "possible_cause", "Iron_Deficiency", 0.85, evidence="Microcytic anemia often due to iron deficiency")
+    kg.add_edge("MCV_LOW", "possible_cause", "Iron_Deficiency", 0.65, evidence="Microcytic anemia often due to iron deficiency")
     kg.add_edge("RDW_HIGH", "possible_cause", "Iron_Deficiency", 0.6, evidence="High RDW supports iron deficiency")
     kg.add_edge("MCV_HIGH", "possible_cause", "Vitamin_B12_Deficiency", 0.75, evidence="Macrocytic pattern suggests B12/folate deficiency")
 

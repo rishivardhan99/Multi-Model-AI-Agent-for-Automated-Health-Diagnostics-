@@ -1,0 +1,394 @@
+{
+  "mode": "pairwise",
+  "individuals": [
+    {
+      "filename": "clean_00001_1768312272406.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00001_1768312272406.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00001_1768312272406.model1_final.model2.json",
+      "eval": {
+        "filename": "clean_00001_1768312272406.model3_final.csv",
+        "overall_score": 80,
+        "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces some minor discrepancies.",
+        "issues": [
+          {
+            "type": "missing",
+            "severity": "low",
+            "message": "Model3 omits the 'inflammation' signal present in Model2."
+          },
+          {
+            "type": "hallucination",
+            "severity": "low",
+            "message": "Model3 introduces a 'glycemic_instability' signal not supported by Model2."
+          }
+        ],
+        "strengths": [
+          "Platelet suppression is a strong theme in both models.",
+          "Thrombocytopenia is identified as a probable cause in both models."
+        ],
+        "suggested_fix": [
+          "Review Model3's interpretation of the 'inflammation' signal to ensure consistency with Model2."
+        ],
+        "metrics": {
+          "precision_like": 0.8,
+          "recall_like": 0.9
+        },
+        "raw_eval": "Model3's overall performance is good, but requires careful review of minor discrepancies with Model2."
+      },
+      "validation": {
+        "raw_score": 80.0,
+        "penalty": 7.0,
+        "validated_score": 73.0,
+        "is_abstain": false,
+        "abstention_type": null,
+        "system_pass": true,
+        "reasons": [
+          "validated_score_meets_soft_threshold"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00002_1768312272417.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00002_1768312272417.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00002_1768312272417.model1_final.model2.json",
+      "eval": {
+        "filename": "clean_00002_1768312272417.model1_final.csv",
+        "overall_score": 80,
+        "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces a new claim of Cardiovascular Risk.",
+        "issues": [
+          {
+            "type": "missing",
+            "severity": "low",
+            "message": "Model3 omits the 'inflammation' signal present in Model2."
+          },
+          {
+            "type": "hallucination",
+            "severity": "high",
+            "message": "Model3 introduces a new claim of Cardiovascular Risk not supported by Model2."
+          }
+        ],
+        "strengths": [
+          "renal_stress",
+          "lipid_dysregulation"
+        ],
+        "suggested_fix": [
+          "Re-evaluate the 'inflammation' signal",
+          "Provide evidence for Cardiovascular Risk claim"
+        ],
+        "metrics": {
+          "precision_like": 0.8,
+          "recall_like": 0.7
+        },
+        "raw_eval": "Model3's overall score is 80 due to the introduction of a new claim and omission of the 'inflammation' signal."
+      },
+      "validation": {
+        "raw_score": 80.0,
+        "penalty": 22.0,
+        "validated_score": 58.0,
+        "is_abstain": true,
+        "abstention_type": "clinical",
+        "system_pass": true,
+        "reasons": [
+          "clinical_abstention_due_to_high_risk_output"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00003_1768312272436.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00003_1768312272436.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00003_1768312272436.model1_final.model2.json",
+      "eval": {
+        "filename": "clean_00003_1768312272436.model1_final.csv",
+        "overall_score": 80,
+        "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces some minor discrepancies.",
+        "issues": [
+          {
+            "type": "missing",
+            "severity": "low",
+            "message": "Model3 omits the 'inflammation' signal present in Model2."
+          },
+          {
+            "type": "hallucination",
+            "severity": "low",
+            "message": "Model3 introduces a 'glycemic_instability' signal not supported by Model2."
+          }
+        ],
+        "strengths": [
+          "Consistent interpretation of anemia and lipid dysregulation signals",
+          "Accurate identification of microcytic anemia"
+        ],
+        "suggested_fix": [
+          "Re-evaluate the 'inflammation' signal to ensure consistency with Model2",
+          "Remove the 'glycemic_instability' signal as it is not supported by Model2"
+        ],
+        "metrics": {
+          "precision_like": 0.9,
+          "recall_like": 0.8
+        },
+        "raw_eval": "Model3's overall performance is good, but requires minor adjustments to ensure consistency with Model2."
+      },
+      "validation": {
+        "raw_score": 80.0,
+        "penalty": 7.0,
+        "validated_score": 73.0,
+        "is_abstain": false,
+        "abstention_type": null,
+        "system_pass": true,
+        "reasons": [
+          "validated_score_meets_soft_threshold"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00009_1768312272453.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00009_1768312272453.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00009_1768312272453.model1_final.model2.json",
+      "eval": {
+        "error": "Groq call failed after retries: None"
+      },
+      "validation": {
+        "raw_score": null,
+        "penalty": 0.0,
+        "validated_score": 0.0,
+        "is_abstain": true,
+        "abstention_type": "technical",
+        "system_pass": null,
+        "reasons": [
+          "technical_abstention_llm_or_parse_error"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00011_1768312272473.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00011_1768312272473.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00011_1768312272473.model1_final.model2.json",
+      "eval": {
+        "filename": "clean_00011_1768312272473.model1_final.csv",
+        "overall_score": 80,
+        "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces some minor discrepancies.",
+        "issues": [
+          {
+            "type": "missing",
+            "severity": "low",
+            "message": "Model3 omits the 'lymphocytosis' signal present in Model2."
+          },
+          {
+            "type": "hallucination",
+            "severity": "low",
+            "message": "Model3 introduces a 'glycemic_instability' signal not supported by Model2."
+          },
+          {
+            "type": "missing",
+            "severity": "low",
+            "message": "Model3 omits the 'inflammation' signal present in Model2."
+          },
+          {
+            "type": "hallucination",
+            "severity": "low",
+            "message": "Model3 introduces a 'metabolic_sign' signal not supported by Model2."
+          }
+        ],
+        "strengths": [
+          "renal_stress"
+        ],
+        "suggested_fix": [
+          "Review Model3's interpretation for discrepancies with Model2's signals."
+        ],
+        "metrics": {
+          "precision_like": 0.8,
+          "recall_like": 0.8
+        },
+        "raw_eval": "Model3's overall performance is good, but requires further review to ensure consistency with Model2's signals."
+      },
+      "validation": {
+        "raw_score": 80.0,
+        "penalty": 14.0,
+        "validated_score": 66.0,
+        "is_abstain": false,
+        "abstention_type": null,
+        "system_pass": true,
+        "reasons": [
+          "validated_score_meets_soft_threshold"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00012_1768312272490.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00012_1768312272490.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00012_1768312272490.model1_final.model2.json",
+      "eval": {
+        "error": "failed_to_parse_llm_output",
+        "raw_text": "{\n  \"filename\": \"clean_00012_1768312272490.model1_final.csv\",\n  \"overall_score\": 80,\n  \"summary\": \"Model3's interpretation is generally consistent with Model2's signals, but introduces some minor discrepancies.\",\n  \"issues\": [\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'renal_stress' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'glycemic_instability' signal not supported by Model2.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'metabolic_sign' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'metabolic_sign' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'systemic_inflammation' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'systemic_inflammation' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'erythrocyte_abnormality' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'erythrocyte_abnormality' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'platelet_suppression' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'platelet_suppression' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'glycemic_instability' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'glycemic_instability' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'renal_stress' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'renal_stress' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'metabolic_sign' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'metabolic_sign' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'systemic_inflammation' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'systemic_inflammation' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'erythrocyte_abnormality' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'erythrocyte_abnormality' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'platelet_suppression' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'platelet_suppression' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'glycemic_instability' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \"low\", \"message\": \"Model3 introduces a 'glycemic_instability' signal not supported by Model2, but with a different value.\"},\n    {\"type\": \"missing\", \"severity\": \"low\", \"message\": \"Model3 omits the 'renal_stress' signal present in Model2.\"},\n    {\"type\": \"hallucination\", \"severity\": \""
+      },
+      "validation": {
+        "raw_score": null,
+        "penalty": 0.0,
+        "validated_score": 0.0,
+        "is_abstain": true,
+        "abstention_type": "technical",
+        "system_pass": null,
+        "reasons": [
+          "technical_abstention_llm_or_parse_error"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00013_1768312272502.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00013_1768312272502.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00013_1768312272502.model1_final.model2.json",
+      "eval": {
+        "error": "Groq call failed after retries: None"
+      },
+      "validation": {
+        "raw_score": null,
+        "penalty": 0.0,
+        "validated_score": 0.0,
+        "is_abstain": true,
+        "abstention_type": "technical",
+        "system_pass": null,
+        "reasons": [
+          "technical_abstention_llm_or_parse_error"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00019_1768312272520.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00019_1768312272520.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00019_1768312272520.model1_final.model2.json",
+      "eval": {
+        "filename": "clean_00019_1768312272520.model1_final.csv",
+        "overall_score": 80,
+        "summary": "Model3's interpretation is generally consistent with Model2's signals, but introduces a claim of 'Cardiovascular_Risk' without sufficient evidence.",
+        "issues": [
+          {
+            "type": "hallucination",
+            "severity": "high",
+            "message": "Model3 introduces a claim of 'Cardiovascular_Risk' without sufficient evidence."
+          },
+          {
+            "type": "missing",
+            "severity": "low",
+            "message": "Model3 omits the 'renal_stress' signal present in Model2."
+          }
+        ],
+        "strengths": [
+          "lipid_dysregulation"
+        ],
+        "suggested_fix": [
+          "Provide more evidence for the 'Cardiovascular_Risk' claim."
+        ],
+        "metrics": {
+          "precision_like": 0.8,
+          "recall_like": 0.7
+        },
+        "raw_eval": "Model3's interpretation is generally consistent with Model2's signals, but introduces a claim of 'Cardiovascular_Risk' without sufficient evidence. The 'renal_stress' signal is omitted."
+      },
+      "validation": {
+        "raw_score": 80.0,
+        "penalty": 22.0,
+        "validated_score": 58.0,
+        "is_abstain": true,
+        "abstention_type": "clinical",
+        "system_pass": true,
+        "reasons": [
+          "clinical_abstention_due_to_high_risk_output"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00020_1768312272531.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00020_1768312272531.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00020_1768312272531.model1_final.model2.json",
+      "eval": {
+        "filename": "clean_00020_1768312272531.model1_final.csv",
+        "overall_score": 80,
+        "summary": "Model3's interpretation of the clinical report is generally consistent with Model2's signals, but introduces some minor discrepancies.",
+        "issues": [
+          {
+            "type": "missing",
+            "severity": "low",
+            "message": "Model3 omits the 'inflammation' signal present in Model2."
+          },
+          {
+            "type": "hallucination",
+            "severity": "low",
+            "message": "Model3 introduces a 'cardiovascular' risk assessment not supported by Model2."
+          }
+        ],
+        "strengths": [
+          "Accurate identification of anemia",
+          "Strong evidence for erythrocyte abnormality"
+        ],
+        "suggested_fix": [
+          "Re-evaluate the 'inflammation' signal",
+          "Consider additional evidence for cardiovascular risk"
+        ],
+        "metrics": {
+          "precision_like": 0.9,
+          "recall_like": 0.8
+        },
+        "raw_eval": "Model3's performance is good, but could benefit from more comprehensive evaluation of inflammation and cardiovascular risk."
+      },
+      "validation": {
+        "raw_score": 80.0,
+        "penalty": 7.0,
+        "validated_score": 73.0,
+        "is_abstain": false,
+        "abstention_type": null,
+        "system_pass": true,
+        "reasons": [
+          "validated_score_meets_soft_threshold"
+        ]
+      }
+    },
+    {
+      "filename": "clean_00021_1768312272547.model1_final",
+      "model2_path": "/app/inputs/model2/clean_00021_1768312272547.model1_final.model2.json",
+      "model3_path": "/app/inputs/model3/clean_00021_1768312272547.model1_final.model2.json",
+      "eval": {
+        "error": "Groq call failed after retries: None"
+      },
+      "validation": {
+        "raw_score": null,
+        "penalty": 0.0,
+        "validated_score": 0.0,
+        "is_abstain": true,
+        "abstention_type": "technical",
+        "system_pass": null,
+        "reasons": [
+          "technical_abstention_llm_or_parse_error"
+        ]
+      }
+    }
+  ],
+  "aggregate": {
+    "llm_raw_count": 6,
+    "llm_raw_mean": 80.0,
+    "llm_raw_median": 80.0,
+    "llm_raw_min": 80.0,
+    "llm_raw_max": 80.0,
+    "system_total_evaluated": 6,
+    "validated_system_pass_count": 6,
+    "validated_system_accuracy": 100.0,
+    "abstention_count": 2,
+    "abstention_rate": 33.33333333333333,
+    "hallucination_rejections": 2,
+    "high_severity_issues": [
+      {
+        "file": "clean_00002_1768312272417.model1_final",
+        "issue": {
+          "type": "hallucination",
+          "severity": "high",
+          "message": "Model3 introduces a new claim of Cardiovascular Risk not supported by Model2."
+        }
+      },
+      {
+        "file": "clean_00019_1768312272520.model1_final",
+        "issue": {
+          "type": "hallucination",
+          "severity": "high",
+          "message": "Model3 introduces a claim of 'Cardiovascular_Risk' without sufficient evidence."
+        }
+      }
+    ]
+  }
+}

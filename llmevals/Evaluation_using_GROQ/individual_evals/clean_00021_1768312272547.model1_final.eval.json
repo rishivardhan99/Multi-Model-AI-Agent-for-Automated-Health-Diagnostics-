@@ -1,0 +1,19 @@
+{
+  "filename": "clean_00021_1768312272547.model1_final",
+  "model2_path": "/app/inputs/model2/clean_00021_1768312272547.model1_final.model2.json",
+  "model3_path": "/app/inputs/model3/clean_00021_1768312272547.model1_final.model2.json",
+  "eval": {
+    "error": "Groq call failed after retries: None"
+  },
+  "validation": {
+    "raw_score": null,
+    "penalty": 0.0,
+    "validated_score": 0.0,
+    "is_abstain": true,
+    "abstention_type": "technical",
+    "system_pass": null,
+    "reasons": [
+      "technical_abstention_llm_or_parse_error"
+    ]
+  }
+}
