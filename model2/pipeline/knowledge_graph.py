@@ -1,3 +1,4 @@
+# model2/pipeline/knowledge_graph.py
 """
 Lightweight knowledge graph implementation for deterministic reasoning.
 (unchanged core; small additional edges added)

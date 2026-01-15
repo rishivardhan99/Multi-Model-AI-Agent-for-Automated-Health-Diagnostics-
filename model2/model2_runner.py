@@ -88,7 +88,7 @@ def run(input_path: str, output_dir: str) -> Dict[str, Any]:
 
         # 2.7 Enrich patterns with signals (add subclinical flags where appropriate)
         try:
-            enrich_patterns_with_signals(patterns, signals, threshold=0.35)
+            enrich_patterns_with_signals(patterns, signals, threshold=0.6)
         except Exception:
             logger.debug("Could not enrich patterns with signals (enrich function failed). Continuing.")
 

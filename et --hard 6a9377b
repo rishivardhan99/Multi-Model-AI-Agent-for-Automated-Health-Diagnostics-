@@ -1,0 +1,10 @@
+[33mfd061ee[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mrishi_rep[m[33m, [m[1;31mmentor/samuvel_rep[m[33m)[m HEAD@{0}: reset: moving to fd061eee2870d425c5d5ce22a49bd4da31b88d33
+[33mfd061ee[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mrishi_rep[m[33m, [m[1;31mmentor/samuvel_rep[m[33m)[m HEAD@{1}: checkout: moving from master to rishi_rep
+[33m6a9377b[m[33m ([m[1;32mmaster[m[33m)[m HEAD@{2}: commit: Medicube: model2 updates, LLM evals, pipeline refinements
+[33mbcf6647[m[33m ([m[1;31morigin/master[m[33m)[m HEAD@{3}: rebase (finish): returning to refs/heads/master
+[33mbcf6647[m[33m ([m[1;31morigin/master[m[33m)[m HEAD@{4}: rebase (continue): Add new modules
+[33m768ea96[m HEAD@{5}: pull --rebase origin master (start): checkout 768ea96d0988ce705e862328a3d2318d2b921d91
+[33md38e137[m HEAD@{6}: commit: Add new modules
+[33mb875d08[m HEAD@{7}: commit: Add complete project README and architecture diagram
+[33mb4d2895[m[33m ([m[1;33mtag: [m[1;33mv1.0-working-pipeline[m[33m)[m HEAD@{8}: commit: Integrate extractor, model2 updates, model3 LLM pipeline, Streamlit app, unified Docker setup
+[33m985a401[m[33m ([m[1;33mtag: [m[1;33mmodel2-freeze-v1[m[33m)[m HEAD@{9}: commit (initial): Freeze Model-1 OCR extraction and Model-2 deterministic KG reasoning

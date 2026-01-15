@@ -40,6 +40,8 @@ def _normalize_header(h: str) -> str:
     s = h.strip()
     s = re.sub(r"\(([^)]+)\)", r" \1", s)            # parentheses -> text
     s = s.replace("%", " percent")
+    s = s.replace(" percent", "_PERCENT")
+
     s = re.sub(r"[^0-9A-Za-z]+", "_", s)
     s = re.sub(r"_+", "_", s)
     s = s.strip("_")

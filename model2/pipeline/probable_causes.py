@@ -1,3 +1,4 @@
+# model2/pipeline/probable_causes.py
 """
 Combine deterministic observations and KG inference to produce ranked probable causes.
 
@@ -103,6 +104,14 @@ def infer_probable_causes(observations: List[str], pattern_details: Dict[str,Any
     anemia_patt = patt.get("anemia", {}) if isinstance(patt.get("anemia", {}), dict) else {}
 
     if not anemia_patt.get("present", False):
+        dys_patt = patt.get("dyslipidemia", {})
+        if not dys_patt.get("present", False):
+            if "Cardiovascular_Risk" in combined:
+                combined["Cardiovascular_Risk"] = round(combined["Cardiovascular_Risk"] * 0.1, 3)
+                adjustments["Cardiovascular_Risk"] = (
+                    "suppressed (no dyslipidemia pattern present; preventive risk not asserted)"
+                )
+
         # CBC shows no anemia → block iron deficiency / B12 deficiency
         for c in ("Iron_Deficiency", "Vitamin_B12_Deficiency"):
             if c in combined:

@@ -74,7 +74,13 @@ class LLMEvaluator:
             # compact both sides to per-item cap
             m2_compact = self._compact_json_text(m2txt, self.max_chars_per_item)
             m3_compact = self._compact_json_text(m3txt, self.max_chars_per_item)
-            prompt = build_pairwise_prompt(m2_compact, m3_compact, tone=self.tone)
+            prompt = build_pairwise_prompt(
+                m2_compact,
+                m3_compact,
+                filename=pair.get("filename", "unknown"),
+                tone=self.tone
+            )
+
             try:
                 resp = self.client.call(prompt, max_tokens=self.max_tokens, temperature=0.0)
                 text = resp.get("text", "")

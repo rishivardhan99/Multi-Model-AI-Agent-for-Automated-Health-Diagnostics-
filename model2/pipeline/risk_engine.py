@@ -1,3 +1,4 @@
+# model2/pipeline/risk_engine.py
 """
 model2/pipeline/risk_engine.py
 Derived metric calculations & heuristic cardiovascular risk estimate.
@@ -106,7 +107,12 @@ def cardio_risk_band(params: Dict[str, Any], derived: Dict[str, Any], themes: Op
     except Exception:
         age = None
 
-    ldl = derived.get("LDL_estimated") or _num(params.get("LDL"))
+    lldl = _num(params.get("LDL"))
+    ldl_est = derived.get("LDL_estimated")
+
+    if ldl is None and ldl_est is not None:
+        ldl = ldl_est * 0.75  # conservative penalty for estimation
+
     hdl = _num(params.get("HDL"))
     tg_hdl = derived.get("TG_to_HDL_ratio")
     glucose = _num(params.get("Glucose_Fasting"))

@@ -1,4 +1,4 @@
-# app.py — Medicube (final, with persistent UI rendering + Chatbot integration)
+# app.py — Multi-Model Medical AI Agent (final, with persistent UI rendering + Chatbot integration)
 # Place this file in your project root (same layout as before): extractor/* , model2/* , model3/* and outputs/
 
 import streamlit as st
@@ -42,7 +42,7 @@ MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
 for d in (SAMPLES, OUT, STRUCTURED_DIR, MODEL1_DIR, MODEL2_DIR, MODEL3_DIR, BATCH_OUT):
     d.mkdir(parents=True, exist_ok=True)
 
-st.set_page_config(page_title="Medicube — Multi-model AI Medical Diagnosis", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Multi-Model Medical AI Agent — Multi-model AI Medical Diagnosis", layout="wide", initial_sidebar_state="expanded")
 
 # ------------------------- Polished CSS -------------------------
 st.markdown(
@@ -110,7 +110,8 @@ def safe_json_load(p: Path):
     try:
         return json.loads(p.read_text(encoding="utf-8"))
     except Exception:
-        return None
+        return {}
+
 
 def render_progress_card(title: str, status: str, detail: str = ""):
     cls = {"running": "running", "success": "success", "failed": "failed", "pending": "pending"}.get(status, "pending")
@@ -321,7 +322,7 @@ st.sidebar.markdown("---")
 st.sidebar.caption("You can set GEMINI_API_KEY in model3/.env (read automatically) or paste for session use.")
 
 # ------------------------- Main layout (uploader left, context right) -------------------------
-st.markdown("<div class='big-title'>Multi-model AI Medical Diagnosis — Medicube</div>", unsafe_allow_html=True)
+st.markdown("<div class='big-title'>Multi-model AI Medical Diagnosis — Multi-Model Medical AI Agent</div>", unsafe_allow_html=True)
 st.markdown("<div class='muted'>Extractor → Model-1 → Model-2 → Model-3. Upload single file or a ZIP of reports for batch testing.</div>", unsafe_allow_html=True)
 
 col_file, col_ctx = st.columns([1,1])  # equal halves; uploader left, context right
@@ -1103,7 +1104,9 @@ def render_chatbot_panel(manifest: dict):
         from chatbot.chatbot_runner import ChatbotRunner  # type: ignore
     except Exception as e:
         st.warning("Chatbot module not available. Skipping Chatbot UI. Reason: " + str(e))
+        
         if show_debug:
+            st.error(str(e))
             st.exception(e)
         return
 
@@ -1121,7 +1124,7 @@ def render_chatbot_panel(manifest: dict):
         return
 
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-title'>Medicube Assistant — Report Q&A</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>Multi-Model Medical AI Agent Assistant — Report Q&A</div>", unsafe_allow_html=True)
     st.markdown(f"**Report:** {manifest.get('report_id')} — Canonical: {manifest.get('canonical_base')}")
     st.markdown("Artifacts:")
     for k, v in manifest.get("artifacts", {}).items():
@@ -1157,7 +1160,7 @@ def render_chatbot_panel(manifest: dict):
             if turn["role"] == "user":
                 st.markdown(f"**You:** {turn['content']}")
             else:
-                st.markdown(f"**Medicube:** {turn['content']}")
+                st.markdown(f"**MedicMulti-Model Medical AI Agentube:** {turn['content']}")
     else:
         st.info("No messages yet. Ask something about the selected report.")
 
@@ -1198,8 +1201,18 @@ try:
         st.markdown("**Model-2 — Patterns & Probable Causes**")
         with st.expander("Model-2 summary (detailed)", expanded=False):
             md_path_str = manifest.get("artifacts", {}).get("model2_json")
-            md = safe_json_load(Path(md_path_str)) if md_path_str else {}
+            md = {}
+
+            if md_path_str:
+                try:
+                    md = safe_json_load(Path(md_path_str))
+                    if not isinstance(md, dict):
+                        md = {}
+                except Exception:
+                    md = {}
+
             meta = md.get("metadata", {}) if isinstance(md, dict) else {}
+
             st.markdown(f"**Report:** {meta.get('base','-')}")
 
             if isinstance(md.get("derived"), dict) and md.get("derived"):

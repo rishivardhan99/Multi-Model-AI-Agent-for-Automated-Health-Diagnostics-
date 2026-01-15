@@ -124,8 +124,9 @@ def _build_confidence_explanation(
 
     num_patterns = len(active_patterns)
 
-    if num_patterns == 0 and presence >= 0.9:
+    if num_patterns == 0 and presence >= 0.9 and themes_score < 0.45:
         return "High confidence due to normal laboratory values and absence of pathological patterns."
+
 
     if num_patterns == 1 and len(isolated_patterns) == 1 and pattern >= 0.5 and kg_adjusted >= 0.6:
         p = isolated_patterns[0].replace("_", " ")

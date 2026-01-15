@@ -1,3 +1,4 @@
+# model2/pipeline/themes.py
 """
 Create ranked themes from signals. Themes represent what the report is mainly about.
 Produces a list sorted by strength. Each theme includes evidence and source patterns.
@@ -16,7 +17,7 @@ _SIGNAL_TO_THEME = {
     "metabolic_sign": "metabolic_sign"
 }
 
-def build_themes(signals: Dict[str, float], top_k: int = 3, min_strength: float = 0.15) -> List[Dict[str, Any]]:
+def build_themes(signals: Dict[str, float], top_k: int = 3, min_strength: float = 0.30) -> List[Dict[str, Any]]:
     """
     Convert signals dict -> top themes list.
     Only includes themes above min_strength; returns at most top_k themes.
@@ -41,6 +42,14 @@ def build_themes(signals: Dict[str, float], top_k: int = 3, min_strength: float 
 
     # sort by strength desc
     candidates.sort(key=lambda x: x[1], reverse=True)
+    top = candidates[:top_k]
+    max_v = top[0][1]
+
+    filtered = []
+    for tname, strength, sname in top:
+        if strength >= max_v * 0.6:
+            filtered.append((tname, strength, sname))
+
 
     # take top_k and normalize strengths relative to top
     top = candidates[:top_k]

@@ -1,3 +1,4 @@
+# model2/pipeline/priors.py
 """
 Reference ranges and conditional priors.
 
@@ -76,12 +77,11 @@ def get_prior(cause: str, themes: Optional[list] = None) -> float:
     detected = {t.get("theme") for t in (themes or [])}
     for r in requires:
         # allow match if requirement is present among detected themes
-        if r in detected:
-            return base
+        for t in themes or []:
+            if t.get("theme") == r and t.get("strength", 0) >= 0.6:
+                return base
+
     # If no direct match but signal present (fallback), return reduced prior
     # e.g., if theme detection missed but a signal stronger than 0.6 exists, allow small prior
     theme_map = {t.get("theme"): t.get("strength", 0.0) for t in (themes or [])}
-    for r in requires:
-        if theme_map.get(r, 0.0) >= 0.6:
-            return base * 0.5
     return 0.0
