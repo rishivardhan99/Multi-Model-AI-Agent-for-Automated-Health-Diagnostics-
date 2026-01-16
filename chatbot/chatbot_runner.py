@@ -88,7 +88,9 @@ class ChatbotRunner:
             response = self.llm.generate(prompt, max_tokens=512)
 
             if not response or response.lower().startswith("[llm not configured]"):
-                raise RuntimeError("LLM unavailable")
+                # Soft fallback — NOT an error
+                response = generate_summary(manifest)
+
 
             # -------------------------
             # 6. OUTPUT SAFETY CHECK
